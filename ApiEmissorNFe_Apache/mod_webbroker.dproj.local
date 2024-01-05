@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2024/01/04 21:53:36.000.983,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\ServerMethodsUnit1.pas</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.757,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\serverfunctionexecutor-min.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.616,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\callbackframework.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.301,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\WebModuleUnit1.pas</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.917,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\css\main.css</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.726,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\json2-min.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.816,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\callbackframework-min.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.537,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\base64.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.867,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\serverfunctioninvoker.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.647,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\serverfunctions.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.600,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\json2.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.710,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\base64-min.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.852,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\connection.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.584,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\js\serverfunctionexecutor.js</Transaction>
+    <Transaction>2024/01/04 21:53:38.000.946,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\css\serverfunctioninvoker.css</Transaction>
+    <Transaction>2024/01/04 21:53:39.000.071,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\templates\serverfunctioninvoker.html</Transaction>
+    <Transaction>2024/01/04 21:53:39.000.135,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\images\expand.png</Transaction>
+    <Transaction>2024/01/04 21:53:39.000.056,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\templates\reversestring.html</Transaction>
+    <Transaction>2024/01/04 21:53:39.000.135,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\ApiEmissorNFELinux\images\collapse.png</Transaction>
+    <Transaction>2024/01/05 18:08:39.397,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\smNfe.pas</Transaction>
+    <Transaction>2024/01/05 18:09:39.000,D:\1 - Gabriel Gonçalves\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\smNfe.pas=</Transaction>
+    <Transaction>2024/01/05 18:11:36.075,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\JsonUtils.pas</Transaction>
+    <Transaction>2024/01/05 18:11:36.107,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\smNfe.pas</Transaction>
+    <Transaction>2024/01/05 18:11:36.154,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\uEmiteNfe.pas</Transaction>
+    <Transaction>2024/01/05 18:28:22.238,D:\1 - Gabriel Gonçalves\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe_Apache\ServerMethodsUnit1.pas=</Transaction>
+  </Transactions>
+</BorlandProject>

@@ -1,0 +1,31 @@
+unit Utils;
+
+interface
+   uses Data.DBXPlatform, JSON;
+   procedure JSONResponse(const AIDCode: Integer; const AContent: string);
+
+implementation
+
+procedure JSONResponse(const AIDCode: Integer; const AContent: string);
+begin
+  GetInvocationMetadata().ResponseCode    := AIDCode;
+  GetInvocationMetadata().ResponseContent :=  AContent;
+end;
+
+function ExisteChave(Objeto: TJSONObject; sChave: string): Boolean;
+var
+   i: Integer;
+   sAux : string;
+begin
+   Result := False;
+   i := 0;
+   for i := 0 to Objeto.Size -1 do begin
+      sAux := Objeto.get(i).JsonString.ToString;
+      if sAux = '"' + sChave + '"' then begin
+         Result := True;
+         Break;
+      end;
+   end;
+end;
+
+end.
