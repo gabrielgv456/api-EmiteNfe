@@ -105,6 +105,7 @@ object WebModule1: TWebModule1
   end
   object classNfe: TDSServerClass
     OnGetClass = classNfeGetClass
+    Server = DSServer1
     Left = 224
     Top = 80
   end

@@ -27,7 +27,6 @@ begin
 end;
 
 function TServerMethods1.updateReverseString(Value: TJSONObject): string;
-var reqObject : TJSONObject;
 begin
    Result := System.StrUtils.ReverseString(Value.GetValue<string>('Value'));
 end;

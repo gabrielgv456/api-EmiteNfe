@@ -23,8 +23,7 @@ var
    sAux : string;
 begin
    Result := False;
-   i := 0;
-   for i := 0 to Objeto.Size -1 do begin
+   for i := 0 to Objeto.Count -1 do begin
       sAux := Objeto.get(i).JsonString.ToString;
       if sAux = '"' + sChave + '"' then begin
          Result := True;

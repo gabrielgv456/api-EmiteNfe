@@ -1,0 +1,35 @@
+unit ServerMethodsUnit1;
+
+interface
+
+uses System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON;
+
+type
+{$METHODINFO ON}
+  TServerMethods1 = class(TComponent)
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    function updateteste(Value: string): string;
+    function updateReverseString(Value: TJSONObject): string;
+  end;
+{$METHODINFO OFF}
+
+implementation
+
+
+uses System.StrUtils;
+
+function TServerMethods1.updateteste(Value: string): string;
+begin
+  Result := 'teste';
+end;
+
+function TServerMethods1.updateReverseString(Value: TJSONObject): string;
+var reqObject : TJSONObject;
+begin
+   Result := System.StrUtils.ReverseString(Value.GetValue<string>('Value'));
+end;
+end.
+

@@ -17,12 +17,12 @@ type
       function GerarNfe(dataReq:TJSONObject) : string;
    private
     function AlimentarNFe(req:TJSONObject) : string;
-    procedure EnviaNFe(pathSave:string);
+    procedure EnviaNFe;
     //procedure LoadXML(RetWS: String; MyWebBrowser: TWebBrowser);
     procedure LerConfiguracao(pathConfig:string);
     var ACBrNFe : TACBrNFe ;
     var ACBRMail : TACBrMail;
-    var memoResp : TStringList;
+    var profilePath : string;
     //var WBResposta: TWebBrowser;
 
 end;
@@ -37,21 +37,21 @@ constructor TEmiteNfe.Create();
 begin
    inherited Create;
    ACBrNFe  := TACBrNFe.Create(Nil);
-   memoResp := TStringList.Create;
    ACBrMail := TACBrMail.Create(Nil);
 end;
 
 function TEmiteNfe.GerarNfe(dataReq:TJSONObject) : string;
 begin
     ACBrNFe.NotasFiscais.Clear;
-    LerConfiguracao( PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + dataReq.GetValue<string>('profile') + '\config.ini');
+    profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + dataReq.GetValue<string>('profile') + '\';
+    if not DirectoryExists(profilePath) then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!');
+    LerConfiguracao(profilePath + 'config.ini');
     Result := AlimentarNFe(dataReq.GetValue<TJSONObject>('nfe'))
 end;
 
 procedure TEmiteNfe.LerConfiguracao(pathConfig:string);
 var
   Ini: TIniFile;
-  StreamMemo: TMemoryStream;
   ok : boolean;
 begin
 
@@ -1001,41 +1001,40 @@ begin
   NotaF.NFe.infIntermed.idCadIntTran := reqInfIntermed.GetValue<String>('idCadIntTran');
 
   ACBrNFe.NotasFiscais.GerarNFe;
-  var pathSave := 'C:/Dell/' + generateHash +'.xml';
-  ACBrNFe.NotasFiscais.GravarXML(pathSave);
-  //acbrNfe.NotasFiscais.Items[0].
-  //Result := loadFile(pathSave);
-  EnviaNfe(pathSave);
-  deleteFile(pathSave);
+  EnviaNfe;
+  var objResult := TJSONObject.Create;
+  try
+     objResult.AddPair('sucesso', True);
+     objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
+     objResult.AddPair('RetWs',ACBrNFe.WebServices.Retorno.RetWS);
+     objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Retorno.TpAmb));
+     objResult.AddPair('verAplic',ACBrNFe.WebServices.Retorno.verAplic);
+     objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.Retorno.cStat));
+     objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.Retorno.cUF));
+     objResult.AddPair('xMotivo',ACBrNFe.WebServices.Retorno.xMotivo);
+     objResult.AddPair('cMsg',IntToStr(ACBrNFe.WebServices.Retorno.cMsg));
+     objResult.AddPair('xMsg',ACBrNFe.WebServices.Retorno.xMsg);
+     objResult.AddPair('Recibo',ACBrNFe.WebServices.Retorno.Recibo);
+     objResult.AddPair('Protocolo',ACBrNFe.WebServices.Retorno.Protocolo);
+    //LoadXML(ACBrNFe.WebServices.Retorno.RetornoWS, WBResposta);
+     Result := objResult.ToString;
+  finally
+     objResult.Free;
+  end;
 end;
 
 
-procedure TEmiteNFe.EnviaNFe(pathSave:string);
-var resp, respWS : string;
+procedure TEmiteNFe.EnviaNFe();
+var pathSave: string;
 begin
-   // ACBrNFe.NotasFiscais.LoadFromFile(pathSave, False);
     ACBrNFe.NotasFiscais.Assinar;
     ACBrNFe.NotasFiscais.Validar;
     if ACBrNFe.NotasFiscais.Items[0].NFe.Ide.modelo = 55 then
       ACBrNFe.Enviar(1)
     else
       ACBrNFe.Enviar(1, True, True);
-
-    MemoResp.Add (ACBrNFe.WebServices.Retorno.RetWS);
-    respWS := ACBrNFe.WebServices.Retorno.RetornoWS;
-    //LoadXML(ACBrNFe.WebServices.Retorno.RetornoWS, WBResposta);
-
-    MemoResp.Add('');
-    MemoResp.Add('Envio NFe');
-    MemoResp.Add('tpAmb: '+ TpAmbToStr(ACBrNFe.WebServices.Retorno.TpAmb));
-    MemoResp.Add('verAplic: '+ ACBrNFe.WebServices.Retorno.verAplic);
-    MemoResp.Add('cStat: '+ IntToStr(ACBrNFe.WebServices.Retorno.cStat));
-    MemoResp.Add('cUF: '+ IntToStr(ACBrNFe.WebServices.Retorno.cUF));
-    MemoResp.Add('xMotivo: '+ ACBrNFe.WebServices.Retorno.xMotivo);
-    MemoResp.Add('cMsg: '+ IntToStr(ACBrNFe.WebServices.Retorno.cMsg));
-    MemoResp.Add('xMsg: '+ ACBrNFe.WebServices.Retorno.xMsg);
-    MemoResp.Add('Recibo: '+ ACBrNFe.WebServices.Retorno.Recibo);
-    MemoResp.Add('Protocolo: '+ ACBrNFe.WebServices.Retorno.Protocolo);
+    pathSave := profilePath + '\xmls\enviados\' + ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID +'.xml';
+    ACBrNFe.NotasFiscais.GravarXML(pathSave);
 end;
 
 //procedure TEmiteNFe.LoadXML(RetWS: String; MyWebBrowser: TWebBrowser);
@@ -1054,7 +1053,6 @@ destructor TEmiteNfe.Destroy;
 begin
    inherited;
    if Assigned(ACBrNFe) then ACBrNFe.Free;
-   if Assigned(memoResp) then memoResp.Free;
    if Assigned(ACBrMail) then ACBrMail.Free;
 end;
 

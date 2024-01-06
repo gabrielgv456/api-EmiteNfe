@@ -27,7 +27,7 @@ begin
 end;
 
 function TNfeController.updateEmiteNFE(Value: TJSONObject): string;
-var reqObject : TJSONObject;
+var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
@@ -37,7 +37,7 @@ begin
       Result := res;
       JSONResponse(200,res);
    finally
-      emiteNFE.Free;
+      if Assigned(emiteNFE) then emiteNFE.Free;
    end;
 end;
 
