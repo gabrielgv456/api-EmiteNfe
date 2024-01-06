@@ -44,7 +44,7 @@ function TEmiteNfe.GerarNfe(dataReq:TJSONObject) : string;
 begin
     ACBrNFe.NotasFiscais.Clear;
     profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + dataReq.GetValue<string>('profile') + '\';
-    if not DirectoryExists(profilePath) then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!');
+    if not DirectoryExists(profilePath) then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
     LerConfiguracao(profilePath + 'config.ini');
     Result := AlimentarNFe(dataReq.GetValue<TJSONObject>('nfe'))
 end;
