@@ -5,7 +5,7 @@ Esta API foi desenvolvida para a emissão de notas fiscais, realizando todos rec
 
 #### Endpoint
 - **Método:** POST
-- **URL:** `http://localhost:8022/datasnap/rest/TNfeController/emiteNFe`
+- **URL:** `http://host:port(8022 = windows)/datasnap/rest/TNfeController/emiteNFe`
 
 #### Payload Exemplo
 ```json
