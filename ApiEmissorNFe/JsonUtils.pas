@@ -1,7 +1,7 @@
 unit JsonUtils;
 
 interface
-   uses Data.DBXPlatform, JSON, System.Classes, System.SysUtils;
+   uses Data.DBXPlatform, JSON, System.Classes, System.SysUtils, System.Generics.Collections;
 
    procedure JSONResponse(const AIDCode: Integer; const AContent: string);
    function containsProperty(Objeto: TJSONObject; sChave: string): Boolean;
@@ -24,7 +24,7 @@ var
 begin
    Result := False;
    for i := 0 to Objeto.Count -1 do begin
-      sAux := Objeto.get(i).JsonString.ToString;
+      sAux := Objeto.Pairs[i].JsonString.ToString;
       if sAux = '"' + sChave + '"' then begin
          Result := True;
          Break;

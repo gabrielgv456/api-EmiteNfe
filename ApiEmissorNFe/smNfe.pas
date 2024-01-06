@@ -31,8 +31,8 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
+   emiteNFE := TEmiteNfe.Create;
    try
-      emiteNFE := TEmiteNfe.Create;
       res := emiteNFE.GerarNfe(Value);
       Result := res;
       JSONResponse(200,res);

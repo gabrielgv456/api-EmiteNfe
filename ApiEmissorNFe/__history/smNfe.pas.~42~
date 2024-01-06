@@ -1,0 +1,46 @@
+unit smNfe;
+
+interface
+
+uses System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON,  Datasnap.DSProviderDataModuleAdapter;
+
+type
+{$METHODINFO ON}
+  TNfeController = class(TComponent)
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    function updateteste(Value: string): string;
+    function updateEmiteNFE(Value: TJSONObject): string;
+  end;
+{$METHODINFO OFF}
+
+implementation
+
+
+uses System.StrUtils, uEmiteNfe, JsonUtils;
+
+function TNfeController.updateteste(Value: string): string;
+begin
+   Result := 'teste';
+end;
+
+function TNfeController.updateEmiteNFE(Value: TJSONObject): string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+emiteNFE := TEmiteNfe.Create;
+   try
+
+      res := emiteNFE.GerarNfe(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+end.
+

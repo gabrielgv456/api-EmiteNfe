@@ -6,7 +6,7 @@ uses
    ACBRNfe, ACBrNFeNotasFiscais, pcnNFe, pcnConversao, JSON, pcnConversaoNFE,
    System.SysUtils, System.StrUtils, ACBrDFeUtil, //SHDocVw,
    ACBrUtil.FilesIO,  ACBrUtil.XMLHTML, //VCL.StdCtrls,
-   ACBrDFeSSL, blcksock,
+   ACBrDFeSSL, blcksock,System.Generics.Collections,
    System.IniFiles, System.Classes, System.TypInfo, ACBrMail;
 
 type
@@ -61,9 +61,9 @@ begin
     ACBrNFe.SSL.SSLType                               := TSSLType(Ini.ReadInteger('WebService', 'SSLType',    5));
     ACBrNFe.Configuracoes.Certificados.URLPFX         := Ini.ReadString( 'Certificado', 'URL',        '');
     ACBrNFe.Configuracoes.Certificados.ArquivoPFX     := Ini.ReadString( 'Certificado', 'Caminho',    '');
-    ACBrNFe.Configuracoes.Certificados.Senha          := Ini.ReadString( 'Certificado', 'Senha',      '');
+    ACBrNFe.Configuracoes.Certificados.Senha          := AnsiString(Ini.ReadString( 'Certificado', 'Senha',      ''));
     ACBrNFe.Configuracoes.Certificados.NumeroSerie    := Ini.ReadString( 'Certificado', 'NumSerie',   '');
-
+    //raise Exception.Create(ACBrNFe.Configuracoes.Certificados.NumeroSerie );
     with ACBrNFe.Configuracoes.Geral do begin
        SSLLib                := TSSLLib( Ini.ReadInteger('Certificado', 'SSLLib',     4));
        SSLCryptLib           := TSSLCryptLib(Ini.ReadInteger('Certificado', 'CryptLib',   0));
