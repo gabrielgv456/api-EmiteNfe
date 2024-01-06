@@ -141,7 +141,7 @@ Esta API foi desenvolvida para a emissão de notas fiscais, realizando todos rec
 
 ```
 #### Pastas
--  Cada cliente tem sua pasta em profiles/HASH_CNPJ.
+-  Cada cliente tem sua pasta em profiles/HASH_CNPJ, onde é armazenado a config de emissão, certificado digital do cliente e outras informações do cliente.
 -  XMLs Enviados: Os XMLs gerados são salvos em profiles/pasta_profilecliente/xmls/enviados.
 
 #### Detalhes Adicionais
