@@ -1,8 +1,8 @@
 {
-	"profile": "54353453_123456789",
+	"profile": "N6G5Y79TUX1PWA1_49397792000179",
 	"nfe": {
 		"natOp": "VENDA PRODUCAO DO ESTAB",
-		"nNF": 20,
+		"nNF": 23,
 		"indPag": "1",
 		"tpNF": "1",
 		"tpEmis": "1",
@@ -13,19 +13,19 @@
 		"finalidadeNFe": "1",
 		"indIntermediador": "",
 		"emitente": {
-			"CNPJCPF": "21545371000129",
-			"IE": "2362528240049",
-			"razaoSocial": "LOJAS EDMIL S/A 00",
-			"nomeFantasia": "LOJAS EDMIL S/A 00",
+			"CNPJCPF": "49397792000179",
+			"IE": "0045364380017",
+			"razaoSocial": "Rafael Ferreira dos Santos",
+			"nomeFantasia": "Gesso Boa Esperanca",
 			"endereco": {
 				"fone": "",
 				"CEP": 0,
-				"logradouro": "CAPITAO JOAO ALVES PEREIRA",
-				"numero": "570",
+				"logradouro": "Rua Carlos Gomes",
+				"numero": "934",
 				"complemento": "",
-				"bairro": "VILA FREITAS",
-				"codMunicipio": 3123601,
-				"nomeMunicipio": "ELOI MENDES",
+				"bairro": "Sinara",
+				"codMunicipio": 3107109,
+				"nomeMunicipio": "BOA ESPERANCA",
 				"UF": "MG"
 			},
 			"CRT": 1
