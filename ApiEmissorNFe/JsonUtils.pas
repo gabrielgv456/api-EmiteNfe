@@ -4,10 +4,11 @@ interface
    uses Data.DBXPlatform, JSON, System.Classes, System.SysUtils, System.Generics.Collections;
 
    procedure JSONResponse(const AIDCode: Integer; const AContent: string);
-   function containsProperty(Objeto: TJSONObject; sChave: string): Boolean;
+   function containsProperty(Objeto: TJSONObject; chave: string): Boolean;
    function iif(condition: Boolean; rVerdade: Variant; rFalso: Variant): Variant;
    function loadFile(const pathFile: string): string;
    function generateHash : string;
+   function validateAllProperties(obj : TJSONObject; propertiesObject: TArray<string>) : string;
 
 implementation
 
@@ -17,7 +18,7 @@ begin
   GetInvocationMetadata().ResponseContent :=  AContent;
 end;
 
-function containsProperty(Objeto: TJSONObject; sChave: string): Boolean;
+function containsProperty(Objeto: TJSONObject; chave: string): Boolean;
 var
    i: Integer;
    sAux : string;
@@ -25,11 +26,20 @@ begin
    Result := False;
    for i := 0 to Objeto.Count -1 do begin
       sAux := Objeto.Pairs[i].JsonString.ToString;
-      if sAux = '"' + sChave + '"' then begin
+      if sAux = '"' + chave + '"' then begin
          Result := True;
          Break;
       end;
    end;
+end;
+
+function validateAllProperties(obj : TJSONObject; propertiesObject: TArray<string>) : string;
+var i: Integer;
+begin
+   for i := Low(propertiesObject) to High(propertiesObject) do  begin
+      Result := Result + iif(containsProperty(obj,propertiesObject[i]), '', iif(result <> '',', ','') + propertiesObject[i]  );
+   end;
+   if Result <> '' then raise Exception.Create('Propriedade(s) ' + Result + ' obrigatória(s)! Verifique nossa documentação para obter detalhes.'  );
 end;
 
 function iif(condition: Boolean; rVerdade: Variant; rFalso: Variant): Variant;

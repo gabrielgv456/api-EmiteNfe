@@ -15,6 +15,7 @@ type
       constructor Create();
       destructor Destroy; override;
       function GerarNfe(dataReq:TJSONObject) : string;
+      function EventoCancelamento(req: TJSONObject): string;
    private
     function AlimentarNFe(req:TJSONObject) : string;
     procedure EnviaNFe;
@@ -719,10 +720,9 @@ begin
            ispNenhum, ispPISSTNaoCompoe, ispPISSTCompoe
          }
          // Indica se o valor do PISST compõe o valor total da NF-e
-         if reqPisSt.GetValue<String>('indSomaPISST') <> '' then
-            IndSomaPISST :=  TIndSomaPISST(StrToInt(reqPisSt.GetValue<String>('indSomaPISST')))
-         else
-            IndSomaPISST := ispNenhum;
+         IndSomaPISST := StrToindSomaPISST(ok,reqPisSt.GetValue<String>('indSomaPISST'));
+         if not ok then raise Exception.Create('IndSomaPISST incorreto');
+
        end;
 
        var reqCofins := reqImposto.GetValue<TJSONObject>('COFINS');
@@ -1004,7 +1004,6 @@ begin
   EnviaNfe;
   var objResult := TJSONObject.Create;
   try
-     objResult.AddPair('sucesso', True);
      objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
      objResult.AddPair('RetWs',ACBrNFe.WebServices.Retorno.RetWS);
      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Retorno.TpAmb));
@@ -1047,6 +1046,48 @@ end;
 //  if ACBrNFe.NotasFiscais.Count > 0 then
 //    MemoResp.Lines.Add('Empresa: ' + ACBrNFe.NotasFiscais.Items[0].NFe.Emit.xNome);
 //end;
+
+function TEmiteNfe.EventoCancelamento(req: TJSONObject): string;
+var ok : Boolean;
+begin
+   profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + req.GetValue<string>('profile') + '\';
+   if not DirectoryExists(profilePath) then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
+   LerConfiguracao(profilePath + 'config.ini');
+   req := req.GetValue<TJSONObject>('evento');
+   validateAllProperties(req,['chave','idLote','CNPJCPF','protocolo','justificativa','ambiente']);
+
+   ACBrNFe.EventoNFe.Evento.Clear;
+
+   with ACBrNFe.EventoNFe.Evento.New do
+   begin
+      infEvento.chNFe := req.GetValue<String>('chave');
+      infEvento.CNPJ   := req.GetValue<String>('CNPJCPF');
+      infEvento.dhEvento := now;
+      infEvento.tpEvento := teCancelamento;
+      infEvento.detEvento.xJust := req.GetValue<String>('justificativa');
+      infEvento.detEvento.nProt := req.GetValue<String>('protocolo');
+      InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
+      if not ok then raise Exception.Create('Tipo de ambiente incorreto!');
+   end;
+
+   ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
+
+   var objResult := TJSONObject.Create;
+   try
+     objResult.AddPair('RetWs',ACBrNFe.WebServices.EnvEvento.RetWS);
+     objResult.AddPair('RetornoWs',ACBrNFe.WebServices.EnvEvento.RetornoWS);
+     objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.TpAmb));
+     objResult.AddPair('verAplic',ACBrNFe.WebServices.EnvEvento.EventoRetorno.verAplic);
+     objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
+     objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
+     objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
+     objResult.AddPair('dhRegEvento',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento);
+     objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
+     Result := objResult.ToString;
+   finally
+     objResult.Free;
+   end;
+end;
 
 
 destructor TEmiteNfe.Destroy;

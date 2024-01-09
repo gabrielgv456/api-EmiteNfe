@@ -11,8 +11,8 @@ type
     { Private declarations }
   public
     { Public declarations }
-    function updateteste(Value: string): string;
     function updateEmiteNFE(Value: TJSONObject): string;
+    function updateEventoCancelamento(Value:TJSONObject): string;
   end;
 {$METHODINFO OFF}
 
@@ -21,10 +21,6 @@ implementation
 
 uses System.StrUtils, uEmiteNfe, JsonUtils;
 
-function TNfeController.updateteste(Value: string): string;
-begin
-   Result := 'teste';
-end;
 
 function TNfeController.updateEmiteNFE(Value: TJSONObject): string;
 var
@@ -34,6 +30,21 @@ begin
    emiteNFE := TEmiteNfe.Create;
    try
       res := emiteNFE.GerarNfe(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.updateEventoCancelamento(Value:TJSONObject): string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create;
+   try
+      res := emiteNFE.EventoCancelamento(Value);
       Result := res;
       JSONResponse(200,res);
    finally
