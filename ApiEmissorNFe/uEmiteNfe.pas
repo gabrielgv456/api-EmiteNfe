@@ -16,11 +16,14 @@ type
       destructor Destroy; override;
       function GerarNfe(dataReq:TJSONObject) : string;
       function EventoCancelamento(req: TJSONObject): string;
+      function StatusServico(profile: string): string;
+      function ConsultaNF(profile, chave: string) : string;
    private
     function AlimentarNFe(req:TJSONObject) : string;
-    procedure EnviaNFe;
+    function EnviaNFe : string;
     //procedure LoadXML(RetWS: String; MyWebBrowser: TWebBrowser);
     procedure LerConfiguracao(pathConfig:string);
+    procedure ConfiguraAmbiente(profile:string);
     var ACBrNFe : TACBrNFe ;
     var ACBRMail : TACBrMail;
     var profilePath : string;
@@ -44,10 +47,105 @@ end;
 function TEmiteNfe.GerarNfe(dataReq:TJSONObject) : string;
 begin
     ACBrNFe.NotasFiscais.Clear;
-    profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + dataReq.GetValue<string>('profile') + '\';
-    if not DirectoryExists(profilePath) then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
-    LerConfiguracao(profilePath + 'config.ini');
+    ConfiguraAmbiente(dataReq.GetValue<string>('profile'));
     Result := AlimentarNFe(dataReq.GetValue<TJSONObject>('nfe'))
+end;
+
+procedure TEmiteNfe.ConfiguraAmbiente(profile:string);
+begin
+   profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + profile + '\';
+   if (not DirectoryExists(profilePath)) or (profile = '') then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
+   LerConfiguracao(profilePath + 'config.ini');
+end;
+
+function TEmiteNfe.StatusServico(profile:string): string;
+var ok : Boolean;
+begin
+   ConfiguraAmbiente(profile);
+   ACBrNFe.WebServices.StatusServico.Executar;
+
+   var objResult := TJSONObject.Create;
+   try
+     objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.StatusServico.tpAmb));
+     objResult.AddPair('verAplic',ACBrNFe.WebServices.StatusServico.verAplic);
+     objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.StatusServico.cStat));
+     objResult.AddPair('xMotivo',ACBrNFe.WebServices.StatusServico.xMotivo);
+     objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.StatusServico.cUF));
+     objResult.AddPair('dhRecbto',DateTimeToStr(ACBrNFe.WebServices.StatusServico.dhRecbto));
+     objResult.AddPair('tMed',IntToStr(ACBrNFe.WebServices.StatusServico.TMed));
+     objResult.AddPair('dhRetorno',DateTimeToStr(ACBrNFe.WebServices.StatusServico.dhRetorno));
+     objResult.AddPair('xObs',ACBrNFe.WebServices.StatusServico.xObs);
+     objResult.AddPair('RetWs',ACBrNFe.WebServices.StatusServico.RetWS);
+     objResult.AddPair('RetornoWs',ACBrNFe.WebServices.StatusServico.RetornoWS);
+     Result := objResult.ToString;
+   finally
+     objResult.Free;
+   end;
+end;
+
+function TEmiteNfe.ConsultaNF(profile, chave:string) : string;
+begin
+  ConfiguraAmbiente(profile);
+  ACBrNFe.NotasFiscais.Clear;
+  ACBrNFe.WebServices.Consulta.NFeChave := chave;
+  ACBrNFe.WebServices.Consulta.Executar;
+
+   var objResult := TJSONObject.Create;
+   try
+      objResult.AddPair('cStat',ACBrNFe.WebServices.Consulta.cStat);
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.Consulta.XMotivo);
+      objResult.AddPair('dhRecbto',ACBrNFe.WebServices.Consulta.DhRecbto);
+      objResult.AddPair('chNFe',ACBrNFe.WebServices.Consulta.NFeChave);
+      objResult.AddPair('protNFe',ACBrNFe.WebServices.Consulta.Protocolo);
+      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Consulta.TpAmb));
+      objResult.AddPair('verAplic',ACBrNFe.WebServices.Consulta.verAplic);
+      objResult.AddPair('RetWs',ACBrNFe.WebServices.Consulta.RetWS);
+      objResult.AddPair('RetornoWs',ACBrNFe.WebServices.Consulta.RetornoWS);
+
+      Result := objResult.ToString;
+   finally
+     objResult.Free;
+   end;
+end;
+
+function TEmiteNfe.EventoCancelamento(req: TJSONObject): string;
+var ok : Boolean;
+begin
+   ConfiguraAmbiente(req.GetValue<string>('profile'));
+   req := req.GetValue<TJSONObject>('evento');
+   validateAllProperties(req,['chave','idLote','CNPJCPF','protocolo','justificativa','ambiente']);
+
+   ACBrNFe.EventoNFe.Evento.Clear;
+
+   with ACBrNFe.EventoNFe.Evento.New do
+   begin
+      infEvento.chNFe := req.GetValue<String>('chave');
+      infEvento.CNPJ   := req.GetValue<String>('CNPJCPF');
+      infEvento.dhEvento := now;
+      infEvento.tpEvento := teCancelamento;
+      infEvento.detEvento.xJust := req.GetValue<String>('justificativa');
+      infEvento.detEvento.nProt := req.GetValue<String>('protocolo');
+      InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
+      if not ok then raise Exception.Create('Tipo de ambiente incorreto!');
+   end;
+
+   ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
+
+   var objResult := TJSONObject.Create;
+   try
+     objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.TpAmb));
+     objResult.AddPair('verAplic',ACBrNFe.WebServices.EnvEvento.EventoRetorno.verAplic);
+     objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
+     objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
+     objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
+     objResult.AddPair('dhRegEvento',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento);
+     objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
+     objResult.AddPair('RetWs',ACBrNFe.WebServices.EnvEvento.RetWS);
+     objResult.AddPair('RetornoWs',ACBrNFe.WebServices.EnvEvento.RetornoWS);
+     Result := objResult.ToString;
+   finally
+     objResult.Free;
+   end;
 end;
 
 procedure TEmiteNfe.LerConfiguracao(pathConfig:string);
@@ -1001,29 +1099,12 @@ begin
   NotaF.NFe.infIntermed.idCadIntTran := reqInfIntermed.GetValue<String>('idCadIntTran');
 
   ACBrNFe.NotasFiscais.GerarNFe;
-  EnviaNfe;
-  var objResult := TJSONObject.Create;
-  try
-     objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
-     objResult.AddPair('RetWs',ACBrNFe.WebServices.Retorno.RetWS);
-     objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Retorno.TpAmb));
-     objResult.AddPair('verAplic',ACBrNFe.WebServices.Retorno.verAplic);
-     objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.Retorno.cStat));
-     objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.Retorno.cUF));
-     objResult.AddPair('xMotivo',ACBrNFe.WebServices.Retorno.xMotivo);
-     objResult.AddPair('cMsg',IntToStr(ACBrNFe.WebServices.Retorno.cMsg));
-     objResult.AddPair('xMsg',ACBrNFe.WebServices.Retorno.xMsg);
-     objResult.AddPair('Recibo',ACBrNFe.WebServices.Retorno.Recibo);
-     objResult.AddPair('Protocolo',ACBrNFe.WebServices.Retorno.Protocolo);
-    //LoadXML(ACBrNFe.WebServices.Retorno.RetornoWS, WBResposta);
-     Result := objResult.ToString;
-  finally
-     objResult.Free;
-  end;
+  result := EnviaNfe;
+
 end;
 
 
-procedure TEmiteNFe.EnviaNFe();
+function TEmiteNFe.EnviaNFe() : string;
 var pathSave: string;
 begin
     ACBrNFe.NotasFiscais.Assinar;
@@ -1034,6 +1115,24 @@ begin
       ACBrNFe.Enviar(1, True, True);
     pathSave := profilePath + '\xmls\enviados\' + ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID +'.xml';
     ACBrNFe.NotasFiscais.GravarXML(pathSave);
+    var objResult := TJSONObject.Create;
+     try
+        objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
+        objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Retorno.TpAmb));
+        objResult.AddPair('verAplic',ACBrNFe.WebServices.Retorno.verAplic);
+        objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.Retorno.cStat));
+        objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.Retorno.cUF));
+        objResult.AddPair('xMotivo',ACBrNFe.WebServices.Retorno.xMotivo);
+        objResult.AddPair('cMsg',IntToStr(ACBrNFe.WebServices.Retorno.cMsg));
+        objResult.AddPair('xMsg',ACBrNFe.WebServices.Retorno.xMsg);
+        objResult.AddPair('Recibo',ACBrNFe.WebServices.Retorno.Recibo);
+        objResult.AddPair('Protocolo',ACBrNFe.WebServices.Retorno.Protocolo);
+        objResult.AddPair('RetWs',ACBrNFe.WebServices.Retorno.RetWS);
+       //LoadXML(ACBrNFe.WebServices.Retorno.RetornoWS, WBResposta);
+        Result := objResult.ToString;
+     finally
+        objResult.Free;
+     end;
 end;
 
 //procedure TEmiteNFe.LoadXML(RetWS: String; MyWebBrowser: TWebBrowser);
@@ -1045,49 +1144,7 @@ end;
 //
 //  if ACBrNFe.NotasFiscais.Count > 0 then
 //    MemoResp.Lines.Add('Empresa: ' + ACBrNFe.NotasFiscais.Items[0].NFe.Emit.xNome);
-//end;
-
-function TEmiteNfe.EventoCancelamento(req: TJSONObject): string;
-var ok : Boolean;
-begin
-   profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + req.GetValue<string>('profile') + '\';
-   if not DirectoryExists(profilePath) then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
-   LerConfiguracao(profilePath + 'config.ini');
-   req := req.GetValue<TJSONObject>('evento');
-   validateAllProperties(req,['chave','idLote','CNPJCPF','protocolo','justificativa','ambiente']);
-
-   ACBrNFe.EventoNFe.Evento.Clear;
-
-   with ACBrNFe.EventoNFe.Evento.New do
-   begin
-      infEvento.chNFe := req.GetValue<String>('chave');
-      infEvento.CNPJ   := req.GetValue<String>('CNPJCPF');
-      infEvento.dhEvento := now;
-      infEvento.tpEvento := teCancelamento;
-      infEvento.detEvento.xJust := req.GetValue<String>('justificativa');
-      infEvento.detEvento.nProt := req.GetValue<String>('protocolo');
-      InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
-      if not ok then raise Exception.Create('Tipo de ambiente incorreto!');
-   end;
-
-   ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
-
-   var objResult := TJSONObject.Create;
-   try
-     objResult.AddPair('RetWs',ACBrNFe.WebServices.EnvEvento.RetWS);
-     objResult.AddPair('RetornoWs',ACBrNFe.WebServices.EnvEvento.RetornoWS);
-     objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.TpAmb));
-     objResult.AddPair('verAplic',ACBrNFe.WebServices.EnvEvento.EventoRetorno.verAplic);
-     objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
-     objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
-     objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
-     objResult.AddPair('dhRegEvento',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento);
-     objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
-     Result := objResult.ToString;
-   finally
-     objResult.Free;
-   end;
-end;
+//end
 
 
 destructor TEmiteNfe.Destroy;

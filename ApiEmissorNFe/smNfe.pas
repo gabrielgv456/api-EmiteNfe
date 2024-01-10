@@ -13,6 +13,8 @@ type
     { Public declarations }
     function updateEmiteNFE(Value: TJSONObject): string;
     function updateEventoCancelamento(Value:TJSONObject): string;
+    function statusServico(profile:string): string;
+    function consultaNF(profile, chave:string): string;
   end;
 {$METHODINFO OFF}
 
@@ -45,6 +47,36 @@ begin
    emiteNFE := TEmiteNfe.Create;
    try
       res := emiteNFE.EventoCancelamento(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.statusServico(profile:string): string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create;
+   try
+      res := emiteNFE.StatusServico(profile);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.consultaNF(profile, chave:string): string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create;
+   try
+      res := emiteNFE.ConsultaNF(profile,chave);
       Result := res;
       JSONResponse(200,res);
    finally
