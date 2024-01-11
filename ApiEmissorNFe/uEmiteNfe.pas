@@ -18,6 +18,7 @@ type
       function EventoCancelamento(req: TJSONObject): string;
       function StatusServico(profile: string): string;
       function ConsultaNF(profile, chave: string) : string;
+      function EventoCartaCorrecao(req: TJSONObject): string;
    private
     function AlimentarNFe(req:TJSONObject) : string;
     function EnviaNFe : string;
@@ -105,6 +106,47 @@ begin
       Result := objResult.ToString;
    finally
      objResult.Free;
+   end;
+end;
+
+function TEmiteNfe.EventoCartaCorrecao(req: TJSONObject): string;
+var
+  Chave, idLote, CNPJ, nSeqEvento, Correcao: string;
+  ok: Boolean;
+begin
+   ConfiguraAmbiente(req.GetValue<string>('profile'));
+   req := req.GetValue<TJSONObject>('evento');
+   validateAllProperties(req,['chave','idLote','CNPJCPF','nSeqEvento','correcao','ambiente']);
+
+   ACBrNFe.EventoNFe.Evento.Clear;
+
+   with ACBrNFe.EventoNFe.Evento.New do
+   begin
+      infEvento.chNFe := req.GetValue<String>('chave');
+      infEvento.CNPJ   := req.GetValue<String>('CNPJCPF');
+      infEvento.dhEvento := now;
+      infEvento.tpEvento := teCCe;
+      infEvento.nSeqEvento := req.GetValue<Integer>('nSeqEvento');
+      infEvento.detEvento.xCorrecao := req.GetValue<String>('correcao');
+      InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'))
+   end;
+
+   ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
+
+   var objResult := TJSONObject.Create;
+   try
+      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.TpAmb));
+      objResult.AddPair('verAplic',ACBrNFe.WebServices.EnvEvento.EventoRetorno.verAplic);
+      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
+      objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
+      objResult.AddPair('dhRegEvento',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento);
+      objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
+      objResult.AddPair('RetWs',ACBrNFe.WebServices.EnvEvento.RetWS);
+      objResult.AddPair('RetornoWs',ACBrNFe.WebServices.EnvEvento.RetornoWS);
+      Result := objResult.ToString;
+   finally
+      objResult.Free;
    end;
 end;
 

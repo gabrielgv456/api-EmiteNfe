@@ -15,6 +15,7 @@ type
     function updateEventoCancelamento(Value:TJSONObject): string;
     function statusServico(profile:string): string;
     function consultaNF(profile, chave:string): string;
+    function updateEventoCartaCorrecao(Value:TJSONObject): string;
   end;
 {$METHODINFO OFF}
 
@@ -77,6 +78,21 @@ begin
    emiteNFE := TEmiteNfe.Create;
    try
       res := emiteNFE.ConsultaNF(profile,chave);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.updateEventoCartaCorrecao(Value:TJSONObject): string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create;
+   try
+      res := emiteNFE.EventoCartaCorrecao(Value);
       Result := res;
       JSONResponse(200,res);
    finally
