@@ -16,6 +16,7 @@ type
     function statusServico(profile:string): string;
     function consultaNF(profile, chave:string): string;
     function updateEventoCartaCorrecao(Value:TJSONObject): string;
+    function updateInutilizaNumeracao(Value:TJSONObject):string;
   end;
 {$METHODINFO OFF}
 
@@ -30,9 +31,9 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create;
+   emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
    try
-      res := emiteNFE.GerarNfe(Value);
+      res := emiteNFE.GerarNfe(Value.GetValue<TJSONObject>('nfe'));
       Result := res;
       JSONResponse(200,res);
    finally
@@ -45,9 +46,9 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create;
+   emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
    try
-      res := emiteNFE.EventoCancelamento(Value);
+      res := emiteNFE.EventoCancelamento(Value.GetValue<TJSONObject>('evento'));
       Result := res;
       JSONResponse(200,res);
    finally
@@ -60,9 +61,9 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create;
+   emiteNFE := TEmiteNfe.Create(profile);
    try
-      res := emiteNFE.StatusServico(profile);
+      res := emiteNFE.StatusServico;
       Result := res;
       JSONResponse(200,res);
    finally
@@ -75,9 +76,9 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create;
+   emiteNFE := TEmiteNfe.Create(profile);
    try
-      res := emiteNFE.ConsultaNF(profile,chave);
+      res := emiteNFE.ConsultaNF(chave);
       Result := res;
       JSONResponse(200,res);
    finally
@@ -90,9 +91,24 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create;
+   emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
    try
-      res := emiteNFE.EventoCartaCorrecao(Value);
+      res := emiteNFE.EventoCartaCorrecao(Value.GetValue<TJSONObject>('evento'));
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.updateInutilizaNumeracao(Value:TJSONObject):string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
+   try
+      res := emiteNFE.InutilizaNumeracao(Value.GetValue<TJSONObject>('inutilizacao'));
       Result := res;
       JSONResponse(200,res);
    finally

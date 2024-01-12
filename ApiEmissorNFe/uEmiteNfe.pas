@@ -12,13 +12,14 @@ uses
 type
    TEmiteNfe = class
    public
-      constructor Create();
+      constructor Create(profile:string);
       destructor Destroy; override;
       function GerarNfe(dataReq:TJSONObject) : string;
       function EventoCancelamento(req: TJSONObject): string;
-      function StatusServico(profile: string): string;
-      function ConsultaNF(profile, chave: string) : string;
+      function StatusServico: string;
+      function ConsultaNF(chave: string) : string;
       function EventoCartaCorrecao(req: TJSONObject): string;
+      function InutilizaNumeracao(req: TJSONObject): string;
    private
     function AlimentarNFe(req:TJSONObject) : string;
     function EnviaNFe : string;
@@ -37,19 +38,19 @@ implementation
 uses
    JsonUtils;
 
-constructor TEmiteNfe.Create();
+constructor TEmiteNfe.Create(profile:string);
 
 begin
    inherited Create;
    ACBrNFe  := TACBrNFe.Create(Nil);
    ACBrMail := TACBrMail.Create(Nil);
+   ConfiguraAmbiente(profile);
 end;
 
 function TEmiteNfe.GerarNfe(dataReq:TJSONObject) : string;
 begin
     ACBrNFe.NotasFiscais.Clear;
-    ConfiguraAmbiente(dataReq.GetValue<string>('profile'));
-    Result := AlimentarNFe(dataReq.GetValue<TJSONObject>('nfe'))
+    Result := AlimentarNFe(dataReq);
 end;
 
 procedure TEmiteNfe.ConfiguraAmbiente(profile:string);
@@ -59,43 +60,40 @@ begin
    LerConfiguracao(profilePath + 'config.ini');
 end;
 
-function TEmiteNfe.StatusServico(profile:string): string;
-var ok : Boolean;
+function TEmiteNfe.StatusServico: string;
 begin
-   ConfiguraAmbiente(profile);
    ACBrNFe.WebServices.StatusServico.Executar;
 
    var objResult := TJSONObject.Create;
    try
-     objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.StatusServico.tpAmb));
-     objResult.AddPair('verAplic',ACBrNFe.WebServices.StatusServico.verAplic);
-     objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.StatusServico.cStat));
-     objResult.AddPair('xMotivo',ACBrNFe.WebServices.StatusServico.xMotivo);
-     objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.StatusServico.cUF));
-     objResult.AddPair('dhRecbto',DateTimeToStr(ACBrNFe.WebServices.StatusServico.dhRecbto));
-     objResult.AddPair('tMed',IntToStr(ACBrNFe.WebServices.StatusServico.TMed));
-     objResult.AddPair('dhRetorno',DateTimeToStr(ACBrNFe.WebServices.StatusServico.dhRetorno));
-     objResult.AddPair('xObs',ACBrNFe.WebServices.StatusServico.xObs);
-     objResult.AddPair('RetWs',ACBrNFe.WebServices.StatusServico.RetWS);
-     objResult.AddPair('RetornoWs',ACBrNFe.WebServices.StatusServico.RetornoWS);
-     Result := objResult.ToString;
+      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.StatusServico.tpAmb));
+      objResult.AddPair('verAplic',ACBrNFe.WebServices.StatusServico.verAplic);
+      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.StatusServico.cStat));
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.StatusServico.xMotivo);
+      objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.StatusServico.cUF));
+      objResult.AddPair('dhRecbto',DateTimeToStr(ACBrNFe.WebServices.StatusServico.dhRecbto));
+      objResult.AddPair('tMed',IntToStr(ACBrNFe.WebServices.StatusServico.TMed));
+      objResult.AddPair('dhRetorno',DateTimeToStr(ACBrNFe.WebServices.StatusServico.dhRetorno));
+      objResult.AddPair('xObs',ACBrNFe.WebServices.StatusServico.xObs);
+      objResult.AddPair('RetWs',ACBrNFe.WebServices.StatusServico.RetWS);
+      objResult.AddPair('RetornoWs',ACBrNFe.WebServices.StatusServico.RetornoWS);
+      Result := objResult.ToString;
    finally
-     objResult.Free;
+      objResult.Free;
    end;
 end;
 
-function TEmiteNfe.ConsultaNF(profile, chave:string) : string;
+function TEmiteNfe.ConsultaNF(chave:string) : string;
 begin
-  ConfiguraAmbiente(profile);
-  ACBrNFe.NotasFiscais.Clear;
-  ACBrNFe.WebServices.Consulta.NFeChave := chave;
-  ACBrNFe.WebServices.Consulta.Executar;
+   ACBrNFe.NotasFiscais.Clear;
+   ACBrNFe.WebServices.Consulta.NFeChave := chave;
+   ACBrNFe.WebServices.Consulta.Executar;
 
    var objResult := TJSONObject.Create;
    try
       objResult.AddPair('cStat',ACBrNFe.WebServices.Consulta.cStat);
       objResult.AddPair('xMotivo',ACBrNFe.WebServices.Consulta.XMotivo);
-      objResult.AddPair('dhRecbto',ACBrNFe.WebServices.Consulta.DhRecbto);
+      objResult.AddPair('dhRecbto',DateTimeToStr(ACBrNFe.WebServices.Consulta.DhRecbto));
       objResult.AddPair('chNFe',ACBrNFe.WebServices.Consulta.NFeChave);
       objResult.AddPair('protNFe',ACBrNFe.WebServices.Consulta.Protocolo);
       objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Consulta.TpAmb));
@@ -105,17 +103,14 @@ begin
 
       Result := objResult.ToString;
    finally
-     objResult.Free;
+      objResult.Free;
    end;
 end;
 
 function TEmiteNfe.EventoCartaCorrecao(req: TJSONObject): string;
 var
-  Chave, idLote, CNPJ, nSeqEvento, Correcao: string;
   ok: Boolean;
 begin
-   ConfiguraAmbiente(req.GetValue<string>('profile'));
-   req := req.GetValue<TJSONObject>('evento');
    validateAllProperties(req,['chave','idLote','CNPJCPF','nSeqEvento','correcao','ambiente']);
 
    ACBrNFe.EventoNFe.Evento.Clear;
@@ -128,7 +123,8 @@ begin
       infEvento.tpEvento := teCCe;
       infEvento.nSeqEvento := req.GetValue<Integer>('nSeqEvento');
       infEvento.detEvento.xCorrecao := req.GetValue<String>('correcao');
-      InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'))
+      InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
+      if not ok then raise Exception.Create('Ambiente incorreto!');
    end;
 
    ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
@@ -140,7 +136,7 @@ begin
       objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
       objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
       objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
-      objResult.AddPair('dhRegEvento',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento);
+      objResult.AddPair('dhRegEvento',DateTimeToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento));
       objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
       objResult.AddPair('RetWs',ACBrNFe.WebServices.EnvEvento.RetWS);
       objResult.AddPair('RetornoWs',ACBrNFe.WebServices.EnvEvento.RetornoWS);
@@ -153,8 +149,6 @@ end;
 function TEmiteNfe.EventoCancelamento(req: TJSONObject): string;
 var ok : Boolean;
 begin
-   ConfiguraAmbiente(req.GetValue<string>('profile'));
-   req := req.GetValue<TJSONObject>('evento');
    validateAllProperties(req,['chave','idLote','CNPJCPF','protocolo','justificativa','ambiente']);
 
    ACBrNFe.EventoNFe.Evento.Clear;
@@ -180,7 +174,7 @@ begin
      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
      objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
      objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
-     objResult.AddPair('dhRegEvento',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento);
+     objResult.AddPair('dhRegEvento',DateTimeToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento));
      objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
      objResult.AddPair('RetWs',ACBrNFe.WebServices.EnvEvento.RetWS);
      objResult.AddPair('RetornoWs',ACBrNFe.WebServices.EnvEvento.RetornoWS);
@@ -190,92 +184,127 @@ begin
    end;
 end;
 
+function TEmiteNfe.InutilizaNumeracao(req:TJSONObject):string;
+var ok : Boolean;
+begin
+   validateAllProperties(req,['ano','modelo','serie','numeroInicial','numeroFinal','justificativa','cnpjEmit','ambiente']);
+
+   ACBrNFe.EventoNFe.Evento.Clear;
+   ACBrNFe.Configuracoes.WebServices.Ambiente := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
+   ACBrNFe.WebServices.Inutiliza(req.GetValue<string>('cnpjEmit'), req.GetValue<string>('justificativa'),
+      req.GetValue<Integer>('ano'), req.GetValue<Integer>('modelo'), req.GetValue<Integer>('serie'),
+      req.GetValue<Integer>('numeroInicial'), req.GetValue<Integer>('numeroFinal'));
+
+   var objResult := TJSONObject.Create;
+   try
+      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Inutilizacao.TpAmb));
+      objResult.AddPair('verAplic',ACBrNFe.WebServices.Inutilizacao.verAplic);
+      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.Inutilizacao.cStat));
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.Inutilizacao.xMotivo);
+      objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.Inutilizacao.cUF));
+      objResult.AddPair('ano',IntToStr(ACBrNFe.WebServices.Inutilizacao.Ano));
+      objResult.AddPair('CNPJ',ACBrNFe.WebServices.Inutilizacao.CNPJ);
+      objResult.AddPair('modelo',IntToStr(ACBrNFe.WebServices.Inutilizacao.Modelo));
+      objResult.AddPair('serie',IntToStr(ACBrNFe.WebServices.Inutilizacao.Serie));
+      objResult.AddPair('numeroInicial',IntToStr(ACBrNFe.WebServices.Inutilizacao.NumeroInicial));
+      objResult.AddPair('numeroFinal',IntToStr(ACBrNFe.WebServices.Inutilizacao.NumeroFinal));
+      objResult.AddPair('dhRecbto',DateTimeToStr(ACBrNFe.WebServices.Inutilizacao.dhRecbto));
+      objResult.AddPair('protocolo',ACBrNFe.WebServices.Inutilizacao.Protocolo);
+      objResult.AddPair('retWS',ACBrNFe.WebServices.Inutilizacao.RetWS);
+      objResult.AddPair('retornoWS',ACBrNFe.WebServices.Inutilizacao.RetornoWS);
+
+      Result := objResult.ToString;
+   finally
+      objResult.Free;
+   end;
+end;
+
 procedure TEmiteNfe.LerConfiguracao(pathConfig:string);
 var
   Ini: TIniFile;
   ok : boolean;
 begin
 
-  Ini := TIniFile.Create(pathConfig);
+Ini := TIniFile.Create(pathConfig);
 
-  try
-    ACBrNFe.SSL.SSLType                               := TSSLType(Ini.ReadInteger('WebService', 'SSLType',    5));
-    ACBrNFe.Configuracoes.Certificados.URLPFX         := Ini.ReadString( 'Certificado', 'URL',        '');
-    ACBrNFe.Configuracoes.Certificados.ArquivoPFX     := Ini.ReadString( 'Certificado', 'Caminho',    '');
-    ACBrNFe.Configuracoes.Certificados.Senha          := AnsiString(Ini.ReadString( 'Certificado', 'Senha',      ''));
-    ACBrNFe.Configuracoes.Certificados.NumeroSerie    := Ini.ReadString( 'Certificado', 'NumSerie',   '');
-    //raise Exception.Create(ACBrNFe.Configuracoes.Certificados.NumeroSerie );
-    with ACBrNFe.Configuracoes.Geral do begin
-       SSLLib                := TSSLLib( Ini.ReadInteger('Certificado', 'SSLLib',     4));
-       SSLCryptLib           := TSSLCryptLib(Ini.ReadInteger('Certificado', 'CryptLib',   0));
-       SSLHttpLib            := TSSLHttpLib(Ini.ReadInteger('Certificado', 'HttpLib',    0));
-       SSLXmlSignLib         := TSSLXmlSignLib(Ini.ReadInteger('Certificado', 'XmlSignLib', 0));
-       AtualizarXMLCancelado := Ini.ReadBool(   'Geral', 'AtualizarXML',     True);
-       ExibirErroSchema      := Ini.ReadBool(   'Geral', 'ExibirErroSchema', True);
-       FormatoAlerta         := Ini.ReadString( 'Geral', 'FormatoAlerta',    'TAG:%TAGNIVEL% ID:%ID%/%TAG%(%DESCRICAO%) - %MSG%.');
-       FormaEmissao          := TpcnTipoEmissao(Ini.ReadInteger('Geral', 'FormaEmissao',     0));
-       ModeloDF              := TpcnModeloDF(Ini.ReadInteger('Geral', 'ModeloDF',         0));
-       VersaoDF              := TpcnVersaoDF(Ini.ReadInteger('Geral', 'VersaoDF',       0));
-       IdCSC                 := Ini.ReadString( 'Geral', 'IdToken',        '');
-       CSC                   := Ini.ReadString( 'Geral', 'Token',          '');
-       Salvar                := Ini.ReadBool(   'Geral', 'Salvar',         True);
-       RetirarAcentos        := Ini.ReadBool(   'Geral', 'RetirarAcentos', True);
-       VersaoQRCode          := veqr200;
-    end;
+   try
+      ACBrNFe.SSL.SSLType                               := TSSLType(Ini.ReadInteger('WebService', 'SSLType',    5));
+      ACBrNFe.Configuracoes.Certificados.URLPFX         := Ini.ReadString( 'Certificado', 'URL',        '');
+      ACBrNFe.Configuracoes.Certificados.ArquivoPFX     := Ini.ReadString( 'Certificado', 'Caminho',    '');
+      ACBrNFe.Configuracoes.Certificados.Senha          := AnsiString(Ini.ReadString( 'Certificado', 'Senha',      ''));
+      ACBrNFe.Configuracoes.Certificados.NumeroSerie    := Ini.ReadString( 'Certificado', 'NumSerie',   '');
 
-    with ACBrNFe.Configuracoes.WebServices do begin
-       UF                       := Ini.ReadString('WebService', 'UF', 'SP');
-       Ambiente                 := StrToTpAmb(ok, Ini.Readstring('WebService', 'Ambiente',   '2'));  //['1', '2'], [taProducao, taHomologacao]);
-       if not ok then raise Exception.Create('Falha ao ler o ambiente');
-       Visualizar               := Ini.ReadBool(   'WebService', 'Visualizar', False);
-       Salvar                   := Ini.ReadBool(   'WebService', 'SalvarSOAP', False);
-       AjustaAguardaConsultaRet := Ini.ReadBool(   'WebService', 'AjustarAut', False);
-       AguardarConsultaRet      := iif(Ini.ReadInteger( 'WebService', 'Aguardar',   0) < 1000, Ini.ReadInteger( 'WebService', 'Aguardar',  0) * 1000 ,Ini.ReadInteger( 'WebService', 'Aguardar',   0));
-       Tentativas               := Ini.ReadInteger( 'WebService', 'Tentativas', 5);
-       IntervaloTentativas      := iif(Ini.ReadInteger( 'WebService', 'Intervalo',  0) < 1000, Ini.ReadInteger( 'WebService', 'Intervalo',  0) * 1000, Ini.ReadInteger( 'WebService', 'Intervalo',  0));
-       TimeOut                  := Ini.ReadInteger('WebService', 'TimeOut',    5000);
-       ProxyHost                := Ini.ReadString('Proxy', 'Host',  '');
-       ProxyPort                := Ini.ReadString('Proxy', 'Porta', '');
-       ProxyUser                := Ini.ReadString('Proxy', 'User',  '');
-       ProxyPass                := Ini.ReadString('Proxy', 'Pass',  '');
-    end;
+      with ACBrNFe.Configuracoes.Geral do begin
+         SSLLib                := TSSLLib( Ini.ReadInteger('Certificado', 'SSLLib',     4));
+         SSLCryptLib           := TSSLCryptLib(Ini.ReadInteger('Certificado', 'CryptLib',   0));
+         SSLHttpLib            := TSSLHttpLib(Ini.ReadInteger('Certificado', 'HttpLib',    0));
+         SSLXmlSignLib         := TSSLXmlSignLib(Ini.ReadInteger('Certificado', 'XmlSignLib', 0));
+         AtualizarXMLCancelado := Ini.ReadBool(   'Geral', 'AtualizarXML',     True);
+         ExibirErroSchema      := Ini.ReadBool(   'Geral', 'ExibirErroSchema', True);
+         FormatoAlerta         := Ini.ReadString( 'Geral', 'FormatoAlerta',    'TAG:%TAGNIVEL% ID:%ID%/%TAG%(%DESCRICAO%) - %MSG%.');
+         FormaEmissao          := TpcnTipoEmissao(Ini.ReadInteger('Geral', 'FormaEmissao',     0));
+         ModeloDF              := TpcnModeloDF(Ini.ReadInteger('Geral', 'ModeloDF',         0));
+         VersaoDF              := TpcnVersaoDF(Ini.ReadInteger('Geral', 'VersaoDF',       0));
+         IdCSC                 := Ini.ReadString( 'Geral', 'IdToken',        '');
+         CSC                   := Ini.ReadString( 'Geral', 'Token',          '');
+         Salvar                := Ini.ReadBool(   'Geral', 'Salvar',         True);
+         RetirarAcentos        := Ini.ReadBool(   'Geral', 'RetirarAcentos', True);
+         VersaoQRCode          := veqr200;
+      end;
 
-    with ACBrNFe.Configuracoes.Arquivos do begin
-       PathSchemas      := Ini.ReadString(  'Arquivos', 'PathSchemas',    PathWithDelim(ExtractFilePath(ParamStr(0)))+'Schemas\'+GetEnumName(TypeInfo(TpcnVersaoDF), integer(ACBrNFe.Configuracoes.Geral.VersaoDF) ));
-       PathSalvar       := Ini.ReadString(  'Arquivos', 'PathSalvar',     PathWithDelim(ExtractFilePath(ParamStr(0)))+'Logs');
-       Salvar           := Ini.ReadBool(  'Arquivos', 'Salvar',           false);
-       SepararPorMes    := Ini.ReadBool(  'Arquivos', 'PastaMensal',      false);
-       AdicionarLiteral := Ini.ReadBool(  'Arquivos', 'AddLiteral',       false);
-       EmissaoPathNFe   := Ini.ReadBool(  'Arquivos', 'EmissaoPathNFe',   false);
-       SalvarEvento     := Ini.ReadBool(  'Arquivos', 'SalvarPathEvento', false);
-       SepararPorCNPJ   := Ini.ReadBool(  'Arquivos', 'SepararPorCNPJ',   false);
-       SepararPorModelo := Ini.ReadBool(  'Arquivos', 'SepararPorModelo', false);
-       PathNFe          := Ini.ReadString(   'Arquivos', 'PathNFe',          '');
-       PathInu          := Ini.ReadString(   'Arquivos', 'PathInu',          '');
-       PathEvento       := Ini.ReadString(   'Arquivos', 'PathEvento',       '');
-    end;
+      with ACBrNFe.Configuracoes.WebServices do begin
+         UF                       := Ini.ReadString('WebService', 'UF', 'SP');
+         Ambiente                 := StrToTpAmb(ok, Ini.Readstring('WebService', 'Ambiente',   '2'));  //['1', '2'], [taProducao, taHomologacao]);
+         if not ok then raise Exception.Create('Falha ao ler o ambiente');
+         Visualizar               := Ini.ReadBool(   'WebService', 'Visualizar', False);
+         Salvar                   := Ini.ReadBool(   'WebService', 'SalvarSOAP', False);
+         AjustaAguardaConsultaRet := Ini.ReadBool(   'WebService', 'AjustarAut', False);
+         AguardarConsultaRet      := iif(Ini.ReadInteger( 'WebService', 'Aguardar',   0) < 1000, Ini.ReadInteger( 'WebService', 'Aguardar',  0) * 1000 ,Ini.ReadInteger( 'WebService', 'Aguardar',   0));
+         Tentativas               := Ini.ReadInteger( 'WebService', 'Tentativas', 5);
+         IntervaloTentativas      := iif(Ini.ReadInteger( 'WebService', 'Intervalo',  0) < 1000, Ini.ReadInteger( 'WebService', 'Intervalo',  0) * 1000, Ini.ReadInteger( 'WebService', 'Intervalo',  0));
+         TimeOut                  := Ini.ReadInteger('WebService', 'TimeOut',    5000);
+         ProxyHost                := Ini.ReadString('Proxy', 'Host',  '');
+         ProxyPort                := Ini.ReadString('Proxy', 'Porta', '');
+         ProxyUser                := Ini.ReadString('Proxy', 'User',  '');
+         ProxyPass                := Ini.ReadString('Proxy', 'Pass',  '');
+      end;
 
-    ACBrMail.Host                := Ini.ReadString(  'Email', 'Host',    '');
-    ACBrMail.Port                := Ini.ReadString(  'Email', 'Port',    '');
-    ACBrMail.Username            := Ini.ReadString(  'Email', 'User',    '');
-    ACBrMail.Password            := Ini.ReadString(  'Email', 'Pass',    '');
-    ACBrMail.From                := ACBrMail.Username;
-    ACBrMail.ReadingConfirmation := False; // Pede confirmacao de leitura do email
-    ACBrMail.UseThread           := False; // Aguarda Envio do Email(nao usa thread)
-    ACBrMail.Subject             := Ini.ReadString('Email', 'Assunto', '');
-    ACBrMail.SetSSL              := Ini.ReadBool(  'Email', 'SSL',     False);
-    ACBrMail.SetTLS              := Ini.ReadBool(  'Email', 'SSL',     False);
-    ACBrMail.FromName            := 'Projeto ACBr - ACBrNFe';
+      with ACBrNFe.Configuracoes.Arquivos do begin
+         PathSchemas      := Ini.ReadString(  'Arquivos', 'PathSchemas',    PathWithDelim(ExtractFilePath(ParamStr(0)))+'Schemas\'+GetEnumName(TypeInfo(TpcnVersaoDF), integer(ACBrNFe.Configuracoes.Geral.VersaoDF) ));
+         PathSalvar       := Ini.ReadString(  'Arquivos', 'PathSalvar',     PathWithDelim(ExtractFilePath(ParamStr(0)))+'Logs');
+         Salvar           := Ini.ReadBool(  'Arquivos', 'Salvar',           false);
+         SepararPorMes    := Ini.ReadBool(  'Arquivos', 'PastaMensal',      false);
+         AdicionarLiteral := Ini.ReadBool(  'Arquivos', 'AddLiteral',       false);
+         EmissaoPathNFe   := Ini.ReadBool(  'Arquivos', 'EmissaoPathNFe',   false);
+         SalvarEvento     := Ini.ReadBool(  'Arquivos', 'SalvarPathEvento', false);
+         SepararPorCNPJ   := Ini.ReadBool(  'Arquivos', 'SepararPorCNPJ',   false);
+         SepararPorModelo := Ini.ReadBool(  'Arquivos', 'SepararPorModelo', false);
+         PathNFe          := Ini.ReadString(   'Arquivos', 'PathNFe',          '');
+         PathInu          := Ini.ReadString(   'Arquivos', 'PathInu',          '');
+         PathEvento       := Ini.ReadString(   'Arquivos', 'PathEvento',       '');
+      end;
 
-    ACBrNFe.SSL.DescarregarCertificado;
-//    StreamMemo := TMemoryStream.Create;
-//    Ini.ReadBinaryStream('Email', 'Mensagem', StreamMemo);
-//    mmEmailMsg.Lines.LoadFromStream(StreamMemo);
-//    StreamMemo.Free;
+      ACBrMail.Host                := Ini.ReadString(  'Email', 'Host',    '');
+      ACBrMail.Port                := Ini.ReadString(  'Email', 'Port',    '');
+      ACBrMail.Username            := Ini.ReadString(  'Email', 'User',    '');
+      ACBrMail.Password            := Ini.ReadString(  'Email', 'Pass',    '');
+      ACBrMail.From                := ACBrMail.Username;
+      ACBrMail.ReadingConfirmation := False; // Pede confirmacao de leitura do email
+      ACBrMail.UseThread           := False; // Aguarda Envio do Email(nao usa thread)
+      ACBrMail.Subject             := Ini.ReadString('Email', 'Assunto', '');
+      ACBrMail.SetSSL              := Ini.ReadBool(  'Email', 'SSL',     False);
+      ACBrMail.SetTLS              := Ini.ReadBool(  'Email', 'SSL',     False);
+      ACBrMail.FromName            := 'Projeto ACBr - ACBrNFe';
 
-  finally
-    Ini.Free;
-  end;
+      ACBrNFe.SSL.DescarregarCertificado;
+      //    StreamMemo := TMemoryStream.Create;
+      //    Ini.ReadBinaryStream('Email', 'Mensagem', StreamMemo);
+      //    mmEmailMsg.Lines.LoadFromStream(StreamMemo);
+      //    StreamMemo.Free;
+
+   finally
+      Ini.Free;
+   end;
 end;
 
 function TEmiteNfe.AlimentarNFe(req:TJSONObject) : string;
@@ -301,140 +330,140 @@ var
   reqEmit, reqEmitEnde, reqDest, reqDestEnde, reqEntrega : TJSONObject;
   arrProdutos : TJSONArray;
 begin
-  NotaF := ACBrNFe.NotasFiscais.Add;
-  NotaF.NFe.Ide.natOp     := req.GetValue<String>('natOp');
-  NotaF.NFe.Ide.indPag    := StrToIndpag(ok, req.GetValue<String>('indPag'));  // ['0', '1', '2', ''], [ipVista, ipPrazo, ipOutras, ipNenhum]);
-  if not ok then raise Exception.Create('indPag incorreto!');
-  NotaF.NFe.Ide.modelo    := 55;
-  NotaF.NFe.Ide.serie     := 1;
-  NotaF.NFe.Ide.nNF       := req.GetValue<Integer>('nNF');
-  NotaF.NFe.Ide.cNF       := GerarCodigoDFe(NotaF.NFe.Ide.nNF);
-  NotaF.NFe.Ide.dEmi      := Date;
-  NotaF.NFe.Ide.dSaiEnt   := Date;
-  NotaF.NFe.Ide.hSaiEnt   := Now;
-  NotaF.NFe.Ide.tpNF      := StrToTpNF(ok, req.GetValue<String>('tpNF')); //  ['0', '1'], [tnEntrada, tnSaida]);
-  if not ok then raise Exception.Create('tpNF incorreto');
-  NotaF.NFe.Ide.tpEmis    := StrToTpEmis(ok, req.GetValue<String>('tpEmis')); // teNormal, teContingencia, teSCAN, teDPEC, teFSDA, teSVCAN, teSVCRS, teSVCSP, teOffLine
-  if not ok then raise Exception.Create('tpEmis incorreto');
-  NotaF.NFe.Ide.tpAmb     := StrToTpAmb(ok, req.GetValue<String>('ambiente'));  // ['1', '2'], [taProducao, taHomologacao]);
-  if not ok then raise Exception.Create('ambiente incorreto');
-  NotaF.NFe.Ide.verProc   := '1.0.0.0'; //Versão do seu sistema
-  NotaF.NFe.Ide.cUF       := UFtoCUF(req.GetValue<String>('cUF'));
-  NotaF.NFe.Ide.cMunFG    := req.GetValue<Integer>('cMunFG');
-  NotaF.NFe.Ide.indFinal  := StrToConsumidorFinal(ok,req.GetValue<String>('indFinal')); //['0', '1'],[cfNao, cfConsumidorFina]
-  if not ok then raise Exception.Create('indFinal incorreto');
-  NotaF.NFe.Ide.finNFe    := StrToFinNFe(ok,req.GetValue<String>('finalidadeNFe')); // ['1', '2', '3', '4'],  [fnNormal, fnComplementar, fnAjuste, fnDevolucao])
-  if  Assigned( ACBrNFe.DANFE ) then
+   NotaF := ACBrNFe.NotasFiscais.Add;
+   NotaF.NFe.Ide.natOp     := req.GetValue<String>('natOp');
+   NotaF.NFe.Ide.indPag    := StrToIndpag(ok, req.GetValue<String>('indPag'));  // ['0', '1', '2', ''], [ipVista, ipPrazo, ipOutras, ipNenhum]);
+   if not ok then raise Exception.Create('indPag incorreto!');
+   NotaF.NFe.Ide.modelo    := 55;
+   NotaF.NFe.Ide.serie     := 1;
+   NotaF.NFe.Ide.nNF       := req.GetValue<Integer>('nNF');
+   NotaF.NFe.Ide.cNF       := GerarCodigoDFe(NotaF.NFe.Ide.nNF);
+   NotaF.NFe.Ide.dEmi      := Date;
+   NotaF.NFe.Ide.dSaiEnt   := Date;
+   NotaF.NFe.Ide.hSaiEnt   := Now;
+   NotaF.NFe.Ide.tpNF      := StrToTpNF(ok, req.GetValue<String>('tpNF')); //  ['0', '1'], [tnEntrada, tnSaida]);
+   if not ok then raise Exception.Create('tpNF incorreto');
+   NotaF.NFe.Ide.tpEmis    := StrToTpEmis(ok, req.GetValue<String>('tpEmis')); // teNormal, teContingencia, teSCAN, teDPEC, teFSDA, teSVCAN, teSVCRS, teSVCSP, teOffLine
+   if not ok then raise Exception.Create('tpEmis incorreto');
+   NotaF.NFe.Ide.tpAmb     := StrToTpAmb(ok, req.GetValue<String>('ambiente'));  // ['1', '2'], [taProducao, taHomologacao]);
+   if not ok then raise Exception.Create('ambiente incorreto');
+   NotaF.NFe.Ide.verProc   := '1.0.0.0'; //Versão do seu sistema
+   NotaF.NFe.Ide.cUF       := UFtoCUF(req.GetValue<String>('cUF'));
+   NotaF.NFe.Ide.cMunFG    := req.GetValue<Integer>('cMunFG');
+   NotaF.NFe.Ide.indFinal  := StrToConsumidorFinal(ok,req.GetValue<String>('indFinal')); //['0', '1'],[cfNao, cfConsumidorFina]
+   if not ok then raise Exception.Create('indFinal incorreto');
+   NotaF.NFe.Ide.finNFe    := StrToFinNFe(ok,req.GetValue<String>('finalidadeNFe')); // ['1', '2', '3', '4'],  [fnNormal, fnComplementar, fnAjuste, fnDevolucao])
+   if  Assigned( ACBrNFe.DANFE ) then
     NotaF.NFe.Ide.tpImp     := ACBrNFe.DANFE.TipoDANFE;
 
-  // Valores aceitos:
-  // iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador
-//  NotaF.NFe.Ide.indIntermed := iiSemOperacao;
+   // Valores aceitos:
+   // iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador
+   //  NotaF.NFe.Ide.indIntermed := iiSemOperacao;
 
-//  NotaF.NFe.Ide.dhCont := date;
-//  NotaF.NFe.Ide.xJust  := 'Justificativa Contingencia';
+   //  NotaF.NFe.Ide.dhCont := date;
+   //  NotaF.NFe.Ide.xJust  := 'Justificativa Contingencia';
 
-  {
-    abaixo o campo incluido no layout a partir da NT 2020/006
-  }
-  {
-    valores aceitos pelo campo:
-    iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador
-  }
-  // Indicador de intermediador/marketplace
-  NotaF.NFe.Ide.indIntermed := StrToIndIntermed(Ok,req.GetValue<String>('indIntermediador'));  //['', '0', '1'],  [iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador]);
-  if not ok then raise Exception.Create('indIntermediador incorreto !');
+   {
+   abaixo o campo incluido no layout a partir da NT 2020/006
+   }
+   {
+   valores aceitos pelo campo:
+   iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador
+   }
+   // Indicador de intermediador/marketplace
+   NotaF.NFe.Ide.indIntermed := StrToIndIntermed(Ok,req.GetValue<String>('indIntermediador'));  //['', '0', '1'],  [iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador]);
+   if not ok then raise Exception.Create('indIntermediador incorreto !');
 
 
 
-  //Para NFe referenciada use os campos abaixo
-  (*
-  Referenciada := NotaF.NFe.Ide.NFref.Add;
-  Referenciada.refNFe       := ''; //NFe Eletronica
+   //Para NFe referenciada use os campos abaixo
+   (*
+   Referenciada := NotaF.NFe.Ide.NFref.Add;
+   Referenciada.refNFe       := ''; //NFe Eletronica
 
-  Referenciada.RefNF.cUF    := 0;  // |
-  Referenciada.RefNF.AAMM   := ''; // |
-  Referenciada.RefNF.CNPJ   := ''; // |
-  Referenciada.RefNF.modelo := 1;  // |- NFe Modelo 1/1A
-  Referenciada.RefNF.serie  := 1;  // |
-  Referenciada.RefNF.nNF    := 0;  // |
+   Referenciada.RefNF.cUF    := 0;  // |
+   Referenciada.RefNF.AAMM   := ''; // |
+   Referenciada.RefNF.CNPJ   := ''; // |
+   Referenciada.RefNF.modelo := 1;  // |- NFe Modelo 1/1A
+   Referenciada.RefNF.serie  := 1;  // |
+   Referenciada.RefNF.nNF    := 0;  // |
 
-  Referenciada.RefNFP.cUF     := 0;  // |
-  Referenciada.RefNFP.AAMM    := ''; // |
-  Referenciada.RefNFP.CNPJCPF := ''; // |
-  Referenciada.RefNFP.IE      := ''; // |- NF produtor Rural
-  Referenciada.RefNFP.modelo  := ''; // |
-  Referenciada.RefNFP.serie   := 1;  // |
-  Referenciada.RefNFP.nNF     := 0;  // |
+   Referenciada.RefNFP.cUF     := 0;  // |
+   Referenciada.RefNFP.AAMM    := ''; // |
+   Referenciada.RefNFP.CNPJCPF := ''; // |
+   Referenciada.RefNFP.IE      := ''; // |- NF produtor Rural
+   Referenciada.RefNFP.modelo  := ''; // |
+   Referenciada.RefNFP.serie   := 1;  // |
+   Referenciada.RefNFP.nNF     := 0;  // |
 
-  Referenciada.RefECF.modelo  := ECFModRef2B; // |
-  Referenciada.RefECF.nECF    := '';          // |- Cupom Fiscal
-  Referenciada.RefECF.nCOO    := '';          // |
-  *)
-  reqEmit := req.GetValue<TJSONObject>('emitente');
-  NotaF.NFe.Emit.CNPJCPF           := reqEmit.GetValue<String>('CNPJCPF');
-  NotaF.NFe.Emit.IE                := reqEmit.GetValue<String>('IE');
-  NotaF.NFe.Emit.xNome             := reqEmit.GetValue<String>('razaoSocial');
-  NotaF.NFe.Emit.xFant             := reqEmit.GetValue<String>('nomeFantasia');
+   Referenciada.RefECF.modelo  := ECFModRef2B; // |
+   Referenciada.RefECF.nECF    := '';          // |- Cupom Fiscal
+   Referenciada.RefECF.nCOO    := '';          // |
+   *)
+   reqEmit := req.GetValue<TJSONObject>('emitente');
+   NotaF.NFe.Emit.CNPJCPF           := reqEmit.GetValue<String>('CNPJCPF');
+   NotaF.NFe.Emit.IE                := reqEmit.GetValue<String>('IE');
+   NotaF.NFe.Emit.xNome             := reqEmit.GetValue<String>('razaoSocial');
+   NotaF.NFe.Emit.xFant             := reqEmit.GetValue<String>('nomeFantasia');
 
-  reqEmitEnde :=  reqEmit.GetValue<TJSONObject>('endereco');
-  NotaF.NFe.Emit.EnderEmit.fone    := reqEmitEnde.GetValue<String>('fone');
-  NotaF.NFe.Emit.EnderEmit.CEP     := reqEmitEnde.GetValue<Integer>('CEP');
-  NotaF.NFe.Emit.EnderEmit.xLgr    := reqEmitEnde.GetValue<String>('logradouro');
-  NotaF.NFe.Emit.EnderEmit.nro     := reqEmitEnde.GetValue<String>('numero');
-  NotaF.NFe.Emit.EnderEmit.xCpl    := reqEmitEnde.GetValue<String>('complemento');
-  NotaF.NFe.Emit.EnderEmit.xBairro := reqEmitEnde.GetValue<String>('bairro');
-  NotaF.NFe.Emit.EnderEmit.cMun    := reqEmitEnde.GetValue<Integer>('codMunicipio');
-  NotaF.NFe.Emit.EnderEmit.xMun    := reqEmitEnde.GetValue<String>('nomeMunicipio');
-  NotaF.NFe.Emit.EnderEmit.UF      := reqEmitEnde.GetValue<String>('UF');
-  NotaF.NFe.Emit.enderEmit.cPais   := 1058;
-  NotaF.NFe.Emit.enderEmit.xPais   := 'BRASIL';
+   reqEmitEnde :=  reqEmit.GetValue<TJSONObject>('endereco');
+   NotaF.NFe.Emit.EnderEmit.fone    := reqEmitEnde.GetValue<String>('fone');
+   NotaF.NFe.Emit.EnderEmit.CEP     := reqEmitEnde.GetValue<Integer>('CEP');
+   NotaF.NFe.Emit.EnderEmit.xLgr    := reqEmitEnde.GetValue<String>('logradouro');
+   NotaF.NFe.Emit.EnderEmit.nro     := reqEmitEnde.GetValue<String>('numero');
+   NotaF.NFe.Emit.EnderEmit.xCpl    := reqEmitEnde.GetValue<String>('complemento');
+   NotaF.NFe.Emit.EnderEmit.xBairro := reqEmitEnde.GetValue<String>('bairro');
+   NotaF.NFe.Emit.EnderEmit.cMun    := reqEmitEnde.GetValue<Integer>('codMunicipio');
+   NotaF.NFe.Emit.EnderEmit.xMun    := reqEmitEnde.GetValue<String>('nomeMunicipio');
+   NotaF.NFe.Emit.EnderEmit.UF      := reqEmitEnde.GetValue<String>('UF');
+   NotaF.NFe.Emit.enderEmit.cPais   := 1058;
+   NotaF.NFe.Emit.enderEmit.xPais   := 'BRASIL';
 
-  NotaF.NFe.Emit.IEST              := '';
-//  NotaF.NFe.Emit.IM                := '2648800'; // Preencher no caso de existir serviços na nota
-//  NotaF.NFe.Emit.CNAE              := '6201500'; // Verifique na cidade do emissor da NFe se é permitido
-                                                 // a inclusão de serviços na NFe
+   NotaF.NFe.Emit.IEST              := '';
+   //  NotaF.NFe.Emit.IM                := '2648800'; // Preencher no caso de existir serviços na nota
+   //  NotaF.NFe.Emit.CNAE              := '6201500'; // Verifique na cidade do emissor da NFe se é permitido
+                         // a inclusão de serviços na NFe
 
-    // esta sendo somando 1 uma vez que o ItemIndex inicia do zero e devemos
-    // passar os valores 1, 2 ou 3
-    // (1-crtSimplesNacional, 2-crtSimplesExcessoReceita, 3-crtRegimeNormal)
-  NotaF.NFe.Emit.CRT  := StrToCRT(Ok, IntToStr(reqEmit.GetValue<Integer>('CRT')));
+   // esta sendo somando 1 uma vez que o ItemIndex inicia do zero e devemos
+   // passar os valores 1, 2 ou 3
+   // (1-crtSimplesNacional, 2-crtSimplesExcessoReceita, 3-crtRegimeNormal)
+   NotaF.NFe.Emit.CRT  := StrToCRT(Ok, IntToStr(reqEmit.GetValue<Integer>('CRT')));
 
-//Para NFe Avulsa preencha os campos abaixo
+   //Para NFe Avulsa preencha os campos abaixo
 
-//  NotaF.NFe.Avulsa.CNPJ    := '';
-//  NotaF.NFe.Avulsa.xOrgao  := '';
-//  NotaF.NFe.Avulsa.matr    := '';
-//  NotaF.NFe.Avulsa.xAgente := '';
-//  NotaF.NFe.Avulsa.fone    := '';
-//  NotaF.NFe.Avulsa.UF      := '';
-//  NotaF.NFe.Avulsa.nDAR    := '';
-//  NotaF.NFe.Avulsa.dEmi    := now;
-//  NotaF.NFe.Avulsa.vDAR    := 0;
-//  NotaF.NFe.Avulsa.repEmi  := '';
-//  NotaF.NFe.Avulsa.dPag    := now;
+   //  NotaF.NFe.Avulsa.CNPJ    := '';
+   //  NotaF.NFe.Avulsa.xOrgao  := '';
+   //  NotaF.NFe.Avulsa.matr    := '';
+   //  NotaF.NFe.Avulsa.xAgente := '';
+   //  NotaF.NFe.Avulsa.fone    := '';
+   //  NotaF.NFe.Avulsa.UF      := '';
+   //  NotaF.NFe.Avulsa.nDAR    := '';
+   //  NotaF.NFe.Avulsa.dEmi    := now;
+   //  NotaF.NFe.Avulsa.vDAR    := 0;
+   //  NotaF.NFe.Avulsa.repEmi  := '';
+   //  NotaF.NFe.Avulsa.dPag    := now;
 
-  reqDest                          := req.GetValue<TJSONObject>('destinatario');
-  NotaF.NFe.Dest.CNPJCPF           := reqDest.GetValue<String>('CNPJCPF');
-  NotaF.NFe.Dest.indIEDest         := StrToindIEDest(ok,reqDest.GetValue<String>('indIEDest')); //['1', '2', '9'], [inContribuinte, inIsento, inNaoContribuinte]);
-  if not ok then raise Exception.Create('indIEDest incorreto.');
-  if NotaF.NFe.Dest.indIEDest = inContribuinte then
-    NotaF.NFe.Dest.IE                := reqDest.GetValue<String>('IE');
-  NotaF.NFe.Dest.ISUF              := reqDest.GetValue<String>('ISUF');
-  NotaF.NFe.Dest.xNome             := reqDest.GetValue<String>('nome');
+   reqDest                          := req.GetValue<TJSONObject>('destinatario');
+   NotaF.NFe.Dest.CNPJCPF           := reqDest.GetValue<String>('CNPJCPF');
+   NotaF.NFe.Dest.indIEDest         := StrToindIEDest(ok,reqDest.GetValue<String>('indIEDest')); //['1', '2', '9'], [inContribuinte, inIsento, inNaoContribuinte]);
+   if not ok then raise Exception.Create('indIEDest incorreto.');
+   if NotaF.NFe.Dest.indIEDest = inContribuinte then
+   NotaF.NFe.Dest.IE                := reqDest.GetValue<String>('IE');
+   NotaF.NFe.Dest.ISUF              := reqDest.GetValue<String>('ISUF');
+   NotaF.NFe.Dest.xNome             := reqDest.GetValue<String>('nome');
 
-  reqDestEnde                      := reqDest.GetValue<TJSONObject>('endereco');
-  NotaF.NFe.Dest.EnderDest.Fone    := reqDestEnde.GetValue<String>('fone');
-  NotaF.NFe.Dest.EnderDest.CEP     := reqDestEnde.GetValue<Integer>('CEP');
-  NotaF.NFe.Dest.EnderDest.xLgr    := reqDestEnde.GetValue<String>('logradouro');
-  NotaF.NFe.Dest.EnderDest.nro     := reqDestEnde.GetValue<String>('numero');
-  NotaF.NFe.Dest.EnderDest.xCpl    := reqDestEnde.GetValue<String>('complemento');
-  NotaF.NFe.Dest.EnderDest.xBairro := reqDestEnde.GetValue<String>('bairro');
-  NotaF.NFe.Dest.EnderDest.cMun    := reqDestEnde.GetValue<Integer>('codMunicipio');
-  NotaF.NFe.Dest.EnderDest.xMun    := reqDestEnde.GetValue<String>('nomeMunicipio');
-  NotaF.NFe.Dest.EnderDest.UF      := reqDestEnde.GetValue<String>('UF');;
-  NotaF.NFe.Dest.EnderDest.cPais   := 1058;
-  NotaF.NFe.Dest.EnderDest.xPais   := 'BRASIL';
+   reqDestEnde                      := reqDest.GetValue<TJSONObject>('endereco');
+   NotaF.NFe.Dest.EnderDest.Fone    := reqDestEnde.GetValue<String>('fone');
+   NotaF.NFe.Dest.EnderDest.CEP     := reqDestEnde.GetValue<Integer>('CEP');
+   NotaF.NFe.Dest.EnderDest.xLgr    := reqDestEnde.GetValue<String>('logradouro');
+   NotaF.NFe.Dest.EnderDest.nro     := reqDestEnde.GetValue<String>('numero');
+   NotaF.NFe.Dest.EnderDest.xCpl    := reqDestEnde.GetValue<String>('complemento');
+   NotaF.NFe.Dest.EnderDest.xBairro := reqDestEnde.GetValue<String>('bairro');
+   NotaF.NFe.Dest.EnderDest.cMun    := reqDestEnde.GetValue<Integer>('codMunicipio');
+   NotaF.NFe.Dest.EnderDest.xMun    := reqDestEnde.GetValue<String>('nomeMunicipio');
+   NotaF.NFe.Dest.EnderDest.UF      := reqDestEnde.GetValue<String>('UF');;
+   NotaF.NFe.Dest.EnderDest.cPais   := 1058;
+   NotaF.NFe.Dest.EnderDest.xPais   := 'BRASIL';
 
    if containsProperty(req,'entrega') then begin
 
@@ -1170,24 +1199,12 @@ begin
         objResult.AddPair('Recibo',ACBrNFe.WebServices.Retorno.Recibo);
         objResult.AddPair('Protocolo',ACBrNFe.WebServices.Retorno.Protocolo);
         objResult.AddPair('RetWs',ACBrNFe.WebServices.Retorno.RetWS);
-       //LoadXML(ACBrNFe.WebServices.Retorno.RetornoWS, WBResposta);
+        objResult.AddPair('RetornoWS',ACBrNFe.WebServices.Retorno.RetornoWS);
         Result := objResult.ToString;
      finally
         objResult.Free;
      end;
 end;
-
-//procedure TEmiteNFe.LoadXML(RetWS: String; MyWebBrowser: TWebBrowser);
-//begin
-//  ACBrUtil.FilesIO.WriteToTXT(PathWithDelim(ExtractFilePath(ParamStr(0))) + 'temp.xml',
-//                      ACBrUtil.XMLHTML.ConverteXMLtoUTF8(RetWS), False, False);
-//
-//  MyWebBrowser.Navigate(PathWithDelim(ExtractFilePath(ParamStr(0))) + 'temp.xml');
-//
-//  if ACBrNFe.NotasFiscais.Count > 0 then
-//    MemoResp.Lines.Add('Empresa: ' + ACBrNFe.NotasFiscais.Items[0].NFe.Emit.xNome);
-//end
-
 
 destructor TEmiteNfe.Destroy;
 begin
