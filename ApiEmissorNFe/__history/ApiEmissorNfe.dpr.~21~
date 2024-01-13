@@ -124,8 +124,8 @@ var
 begin
   WriteCommands;
   LServer := TIdHTTPWebBrokerBridge.Create(nil);
-  var authJWT := TAuthJWT.Create;
-  LServer.OnParseAuthentication := DoParseAuthentication;
+  //var authJWT := TAuthJWT.Create;
+  //LServer.OnParseAuthentication := authJWT.DoParseAuthentication;
   try
     LServer.DefaultPort := APort;
     StartServer(LServer);
@@ -160,6 +160,7 @@ begin
     TerminateThreads();
   finally
     LServer.Free;
+    authJWT.Free;
   end;
 end;
 
