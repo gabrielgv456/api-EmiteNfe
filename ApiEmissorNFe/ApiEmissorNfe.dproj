@@ -97,6 +97,7 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <DCCReference Include="uEmiteNfe.pas"/>
         <DCCReference Include="smNfe.pas"/>
         <DCCReference Include="JsonUtils.pas"/>
+        <DCCReference Include="uAuthJWT.pas"/>
         <None Include="js\base64.js"/>
         <None Include="js\serverfunctionexecutor.js"/>
         <None Include="js\json2.js"/>

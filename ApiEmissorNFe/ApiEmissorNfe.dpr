@@ -17,7 +17,8 @@ uses
   ServerConst1 in 'ServerConst1.pas',
   uEmiteNfe in 'uEmiteNfe.pas',
   smNfe in 'smNfe.pas',
-  JsonUtils in 'JsonUtils.pas';
+  JsonUtils in 'JsonUtils.pas',
+  uAuthJWT in 'uAuthJWT.pas';
 
 {$R *.res}
 
@@ -114,6 +115,8 @@ begin
   Write(cArrow);
 end;
 
+
+
 procedure RunServer(APort: Integer);
 var
   LServer: TIdHTTPWebBrokerBridge;
@@ -121,6 +124,8 @@ var
 begin
   WriteCommands;
   LServer := TIdHTTPWebBrokerBridge.Create(nil);
+  //var authJWT := TAuthJWT.Create;
+  //LServer.OnParseAuthentication := authJWT.DoParseAuthentication;
   try
     LServer.DefaultPort := APort;
     StartServer(LServer);
@@ -155,6 +160,7 @@ begin
     TerminateThreads();
   finally
     LServer.Free;
+    authJWT.Free;
   end;
 end;
 

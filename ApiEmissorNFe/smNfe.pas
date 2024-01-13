@@ -2,7 +2,7 @@ unit smNfe;
 
 interface
 
-uses System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON,  Datasnap.DSProviderDataModuleAdapter;
+uses System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON, Data.DBXPlatform, Web.HTTPApp, Datasnap.DSHTTPWebBroker;
 
 type
 {$METHODINFO ON}
@@ -13,24 +13,41 @@ type
     { Public declarations }
     function updateEmiteNFE(Value: TJSONObject): string;
     function updateEventoCancelamento(Value:TJSONObject): string;
-    function statusServico(profile:string): string;
-    function consultaNF(profile, chave:string): string;
+    function statusServico: string;
+    function consultaNF: string;
     function updateEventoCartaCorrecao(Value:TJSONObject): string;
     function updateInutilizaNumeracao(Value:TJSONObject):string;
+    function updateCreateToken(Value:TJSONObject):string;
+    function validateToken : string;
   end;
 {$METHODINFO OFF}
 
 implementation
 
 
-uses System.StrUtils, uEmiteNfe, JsonUtils;
+uses System.StrUtils, uEmiteNfe, JsonUtils, uAuthJWT;
 
+
+function TNfeController.updateCreateToken(Value:TJSONObject) : string;
+var
+   authJWT : TAuthJWT;
+begin
+   validateAllProperties(Value,['user','key']);
+   authJWT := TAuthJWT.Create;
+   try
+      result  := authJWT.createToken(Value.GetValue<String>('key'),Value.GetValue<String>('user'));
+      JSONResponse(200,result);
+   finally
+      if Assigned(authJWT) then authJWT.Free;
+   end;
+end;
 
 function TNfeController.updateEmiteNFE(Value: TJSONObject): string;
 var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
+   validateAllProperties(Value,['profile','nfe']);
    emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
    try
       res := emiteNFE.GerarNfe(Value.GetValue<TJSONObject>('nfe'));
@@ -46,6 +63,7 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
+   validateAllProperties(Value,['profile','evento']);
    emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
    try
       res := emiteNFE.EventoCancelamento(Value.GetValue<TJSONObject>('evento'));
@@ -56,11 +74,22 @@ begin
    end;
 end;
 
-function TNfeController.statusServico(profile:string): string;
+function TNfeController.statusServico: string;
 var
     emiteNFE  : TEmiteNfe;
-    res : string;
+    res, profile : string;
+    params: TDSInvocationMetadata;
+    i : integer;
+    ok : Boolean;
 begin
+   params := GetInvocationMetadata;
+   for i := 0 to params.QueryParams.Count -1 do begin
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'profile' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "profile"');
+          profile :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
+   end;
+   if profile = EmptyStr then raise Exception.Create('Informe corretamente o parametro "profile"');
    emiteNFE := TEmiteNfe.Create(profile);
    try
       res := emiteNFE.StatusServico;
@@ -71,11 +100,28 @@ begin
    end;
 end;
 
-function TNfeController.consultaNF(profile, chave:string): string;
+function TNfeController.consultaNF: string;
 var
     emiteNFE  : TEmiteNfe;
-    res : string;
+    res, profile, chave : string;
+    params: TDSInvocationMetadata;
+    i : integer;
+    ok:boolean;
+    tst : TAuthJWT;
 begin
+   params := GetInvocationMetadata;
+   for i := 0 to params.QueryParams.Count -1 do begin
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'profile' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "profile"');
+          profile :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'chave' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "chave"');
+          chave :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
+   end;
+   if profile = EmptyStr then raise Exception.Create('Informe corretamente o parametro "profile"');
+   if chave = EmptyStr then raise Exception.Create('Informe corretamente o parametro "chave"');
    emiteNFE := TEmiteNfe.Create(profile);
    try
       res := emiteNFE.ConsultaNF(chave);
@@ -91,6 +137,7 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
+   validateAllProperties(Value,['profile','evento']);
    emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
    try
       res := emiteNFE.EventoCartaCorrecao(Value.GetValue<TJSONObject>('evento'));
@@ -106,6 +153,7 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
+   validateAllProperties(Value,['profile','inutilizacao']);
    emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
    try
       res := emiteNFE.InutilizaNumeracao(Value.GetValue<TJSONObject>('inutilizacao'));

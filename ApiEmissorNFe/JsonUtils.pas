@@ -9,6 +9,7 @@ interface
    function loadFile(const pathFile: string): string;
    function generateHash : string;
    function validateAllProperties(obj : TJSONObject; propertiesObject: TArray<string>) : string;
+   function textBeforeOrAfterCharacter(out ok : boolean;TextOriginal, Character: string; GetBefore: Boolean): string;
 
 implementation
 
@@ -73,6 +74,27 @@ var
 begin
   CreateGUID(GUID);
   Result := GUIDToString(GUID);
+end;
+
+function TextBeforeOrAfterCharacter(out ok: boolean;TextOriginal, Character: string; GetBefore: Boolean): string;
+var
+  Position: Integer;
+  ResultText: string;
+begin
+  Position := Pos(Character, TextOriginal);
+
+  if Position > 0 then
+  begin
+    if GetBefore then
+      ResultText := Copy(TextOriginal, 1, Position - 1)
+    else
+      ResultText := Copy(TextOriginal, Position + Length(Character), MaxInt);
+    ok:= True;
+  end
+  else
+   ok := False;
+
+  Result := ResultText;
 end;
 
 
