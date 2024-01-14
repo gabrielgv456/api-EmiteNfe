@@ -2,12 +2,13 @@ unit uAuthJWT;
 
 interface
 uses
-  JOSE.Producer, System.SysUtils, JOSE.Core.JWA, JOSE.Core.JWT, JSON, JOSE.Core.Builder,IdContext;
+  JOSE.Producer, System.SysUtils, JOSE.Core.JWA, JOSE.Core.JWT, JSON, JOSE.Core.Builder,IdContext, uEmiteNfe;
 
 type
    TAuthJWT = class
    public
       constructor Create;
+      destructor Destroy;override;
       function createToken(key,cnpj:string):string;
       function isTokenValid(token:string):boolean;
       procedure DoParseAuthentication(AContext: TIdContext; const AAuthType, AAuthData: String; var VUsername, VPassword: String; var VHandled: Boolean);
@@ -18,7 +19,7 @@ end;
 implementation
 
 uses
-   JsonUtils;
+   JsonUtils, ServerConst1;
 
 constructor TAuthJWT.Create;
 
@@ -27,14 +28,18 @@ begin
 end;
 
 procedure TAuthJWT.DoParseAuthentication(AContext: TIdContext; const AAuthType, AAuthData: String; var VUsername, VPassword: String; var VHandled: Boolean);
+var FJWT : TJWT;
 begin
     VHandled := AAuthType.Equals('Bearer') and IsTokenValid(AAuthData);
-    if not VHandled then JSONResponse(401,'{"error":"Token Invalido"}')
+    if not VHandled then JSONResponse(401,'{"error":"Token Invalido"}') ;
+
 end;
 
 function TAuthJWT.isTokenValid(token:string):boolean;
 var
-   LToken : TJWT ;
+   LToken   : TJWT;
+   claims   : TJSONObject;
+   user, key, profilePath : string;
 begin
    try
       LToken := TJOSE.Verify(keyJWT,token);
@@ -42,13 +47,36 @@ begin
       begin
          try
             result := LToken.Verified;
+            if LToken.Claims.Issuer <> 'Smart NF API - Solução fiscal para emissão de notas de forma ágil e moderna' then
+               result:= False;
+            if LToken.Claims.Expiration > Now then
+               result:= False;
+            if Result then begin
+               claims := LToken.Claims.JSON;
+               if (not containsProperty(claims,'user')) or (not containsProperty(claims,'key')) then begin
+                  Result := False;
+                  Exit;
+               end;
+               user := claims.GetValue<string>('user');
+               key  := claims.GetValue<string>('key');
+               if (user = EmptyStr) or (key = EmptyStr) then begin
+                  Result := False;
+                  Exit;
+               end;
+               profile := key + '_' + user;
+               profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + profile + '\';
+               if (not DirectoryExists(profilePath)) then begin
+                  Result := False;
+                  Exit;
+               end;
+            end;
          finally
             LToken.Free;
          end;
       end;
    except on E:Exception do
       Result := False;
-   end;
+   end
 end;
 
 function TAuthJWT.createToken(key,cnpj:string):string;
@@ -65,12 +93,9 @@ begin
     .SetIssuer('Smart NF API - Solução fiscal para emissão de notas de forma ágil e moderna')
     .SetIssuedAt(Now)
     .SetExpiration(Now + 1)
-
     .SetCustomClaim('user', cnpj)
     .SetCustomClaim('key', key)
-
     .SetKey(keyJWT)
-
     .Build
     .GetCompactToken
   ;
@@ -81,6 +106,12 @@ begin
    finally
       objResult.Free;
    end;
+end;
+
+destructor TAuthJWT.Destroy;
+begin
+   inherited;
+
 end;
 
 end.

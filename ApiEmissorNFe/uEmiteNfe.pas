@@ -34,7 +34,7 @@ end;
 implementation
 
 uses
-   JsonUtils;
+   JsonUtils, ServerConst1;
 
 constructor TEmiteNfe.Create(profile:string);
 
@@ -1197,6 +1197,7 @@ end;
 destructor TEmiteNfe.Destroy;
 begin
    inherited;
+   //profile := EmptyStr;
    if Assigned(ACBrNFe) then ACBrNFe.Free;
    if Assigned(ACBrMail) then ACBrMail.Free;
 end;

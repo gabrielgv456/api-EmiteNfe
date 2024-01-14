@@ -18,14 +18,13 @@ type
     function updateEventoCartaCorrecao(Value:TJSONObject): string;
     function updateInutilizaNumeracao(Value:TJSONObject):string;
     function updateCreateToken(Value:TJSONObject):string;
-    function validateToken : string;
   end;
 {$METHODINFO OFF}
 
 implementation
 
 
-uses System.StrUtils, uEmiteNfe, JsonUtils, uAuthJWT;
+uses System.StrUtils, uEmiteNfe, JsonUtils, uAuthJWT, ServerConst1;
 
 
 function TNfeController.updateCreateToken(Value:TJSONObject) : string;
@@ -47,8 +46,8 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   validateAllProperties(Value,['profile','nfe']);
-   emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
+   validateAllProperties(Value,['nfe']);
+   emiteNFE := TEmiteNfe.Create(profile);
    try
       res := emiteNFE.GerarNfe(Value.GetValue<TJSONObject>('nfe'));
       Result := res;
@@ -63,8 +62,8 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   validateAllProperties(Value,['profile','evento']);
-   emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
+   validateAllProperties(Value,['evento']);
+   emiteNFE := TEmiteNfe.Create(profile);
    try
       res := emiteNFE.EventoCancelamento(Value.GetValue<TJSONObject>('evento'));
       Result := res;
@@ -77,19 +76,8 @@ end;
 function TNfeController.statusServico: string;
 var
     emiteNFE  : TEmiteNfe;
-    res, profile : string;
-    params: TDSInvocationMetadata;
-    i : integer;
-    ok : Boolean;
+    res : string;
 begin
-   params := GetInvocationMetadata;
-   for i := 0 to params.QueryParams.Count -1 do begin
-       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'profile' then begin
-          if not ok then raise Exception.Create('Informe corretamente o parametro "profile"');
-          profile :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
-       end;
-   end;
-   if profile = EmptyStr then raise Exception.Create('Informe corretamente o parametro "profile"');
    emiteNFE := TEmiteNfe.Create(profile);
    try
       res := emiteNFE.StatusServico;
@@ -103,24 +91,18 @@ end;
 function TNfeController.consultaNF: string;
 var
     emiteNFE  : TEmiteNfe;
-    res, profile, chave : string;
+    res , chave: string;
     params: TDSInvocationMetadata;
     i : integer;
     ok:boolean;
-    tst : TAuthJWT;
 begin
    params := GetInvocationMetadata;
    for i := 0 to params.QueryParams.Count -1 do begin
-       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'profile' then begin
-          if not ok then raise Exception.Create('Informe corretamente o parametro "profile"');
-          profile :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
-       end;
        if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'chave' then begin
           if not ok then raise Exception.Create('Informe corretamente o parametro "chave"');
           chave :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
        end;
    end;
-   if profile = EmptyStr then raise Exception.Create('Informe corretamente o parametro "profile"');
    if chave = EmptyStr then raise Exception.Create('Informe corretamente o parametro "chave"');
    emiteNFE := TEmiteNfe.Create(profile);
    try
@@ -137,8 +119,8 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   validateAllProperties(Value,['profile','evento']);
-   emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
+   validateAllProperties(Value,['evento']);
+   emiteNFE := TEmiteNfe.Create(profile);
    try
       res := emiteNFE.EventoCartaCorrecao(Value.GetValue<TJSONObject>('evento'));
       Result := res;
@@ -153,8 +135,8 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   validateAllProperties(Value,['profile','inutilizacao']);
-   emiteNFE := TEmiteNfe.Create(Value.GetValue<string>('profile'));
+   validateAllProperties(Value,['inutilizacao']);
+   emiteNFE := TEmiteNfe.Create(profile);
    try
       res := emiteNFE.InutilizaNumeracao(Value.GetValue<TJSONObject>('inutilizacao'));
       Result := res;
