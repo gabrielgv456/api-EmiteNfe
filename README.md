@@ -8,7 +8,7 @@ Esta API foi desenvolvida para a emissão de notas fiscais, realizando todos rec
 Acessível em https://doc-emitenfe.safyra.com.br/
 ou se preferir swagger https://doc-emitenfe.safyra.com.br/swagger
 
-### Autenticação
+#### Autenticação
 Utilizamos autenticação segura JWT com prazo de expiração de 1 dia 🔐
 
 #### Pastas
