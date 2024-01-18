@@ -22,6 +22,7 @@ type
     DSProxyGenerator1: TDSProxyGenerator;
     DSServerMetaDataProvider1: TDSServerMetaDataProvider;
     classNfe: TDSServerClass;
+    DSAuthenticationManager: TDSAuthenticationManager;
     procedure DSServerClass1GetClass(DSServerClass: TDSServerClass;
       var PersistentClass: TPersistentClass);
     procedure classNfeGetClass(DSServerClass: TDSServerClass;
@@ -35,6 +36,9 @@ type
     procedure WebFileDispatcher1BeforeDispatch(Sender: TObject;
       const AFileName: string; Request: TWebRequest; Response: TWebResponse;
       var Handled: Boolean);
+    procedure DSAuthenticationManagerUserAuthenticate(Sender: TObject;
+      const Protocol, Context, User, Password: string; var valid: Boolean;
+      UserRoles: TStrings);
     procedure WebModuleCreate(Sender: TObject);
   private
     { Private declarations }
@@ -48,13 +52,14 @@ type
 var
   WebModuleClass: TComponentClass = TWebModule1;
 
+
 implementation
 
 {%CLASSGROUP 'System.Classes.TPersistent'}
 
 {$R *.dfm}
 
-uses ServerMethodsUnit1, Web.WebReq, smNfe;
+uses ServerMethodsUnit1, Web.WebReq, smNfe, ServerConst1;
 
 procedure TWebModule1.DSServerClass1GetClass(
   DSServerClass: TDSServerClass; var PersistentClass: TPersistentClass);
@@ -66,6 +71,13 @@ procedure TWebModule1.classNfeGetClass(
   DSServerClass: TDSServerClass; var PersistentClass: TPersistentClass);
 begin
   PersistentClass := smNfe.TNfeController;
+end;
+
+procedure TWebModule1.DSAuthenticationManagerUserAuthenticate(Sender: TObject;
+  const Protocol, Context, User, Password: string; var valid: Boolean;
+  UserRoles: TStrings );
+begin
+   Valid := ServerConst1.isTokenValid;
 end;
 
 procedure TWebModule1.ServerFunctionInvokerHTMLTag(Sender: TObject; Tag: TTag;
@@ -80,10 +92,7 @@ begin
   else if SameText(TagString, 'classname') then
     ReplaceText := smNfe.TNfeController.ClassName
   else if SameText(TagString, 'loginrequired') then
-    if DSHTTPWebDispatcher1.AuthenticationManager <> nil then
       ReplaceText := 'true'
-    else
-      ReplaceText := 'false'
   else if SameText(TagString, 'serverfunctionsjs') then
     ReplaceText := string(Request.InternalScriptName) + '/js/serverfunctions.js'
   else if SameText(TagString, 'servertime') then
@@ -109,6 +118,9 @@ end;
 procedure TWebModule1.WebModuleBeforeDispatch(Sender: TObject;
   Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
 begin
+  if not ServerConst1.isBearer then ServerConst1.isTokenValid := False;
+  if Request.PathInfo = '/datasnap/rest/TNfeController/CreateToken' then
+    ServerConst1.isTokenValid := True;
   if FServerFunctionInvokerAction <> nil then
     FServerFunctionInvokerAction.Enabled := AllowServerFunctionInvoker;
 end;
