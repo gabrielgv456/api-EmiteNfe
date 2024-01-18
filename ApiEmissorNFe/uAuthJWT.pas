@@ -49,7 +49,7 @@ begin
             result := LToken.Verified;
             if LToken.Claims.Issuer <> 'Smart NF API - Solução fiscal para emissão de notas de forma ágil e moderna' then
                result:= False;
-            if LToken.Claims.Expiration > Now then
+            if LToken.Claims.Expiration < Now then
                result:= False;
             if Result then begin
                claims := LToken.Claims.JSON;

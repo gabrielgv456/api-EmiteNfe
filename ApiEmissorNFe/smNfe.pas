@@ -46,10 +46,9 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   validateAllProperties(Value,['nfe']);
    emiteNFE := TEmiteNfe.Create(profile);
    try
-      res := emiteNFE.GerarNfe(Value.GetValue<TJSONObject>('nfe'));
+      res := emiteNFE.GerarNfe(Value);
       Result := res;
       JSONResponse(200,res);
    finally
@@ -62,10 +61,9 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   validateAllProperties(Value,['evento']);
    emiteNFE := TEmiteNfe.Create(profile);
    try
-      res := emiteNFE.EventoCancelamento(Value.GetValue<TJSONObject>('evento'));
+      res := emiteNFE.EventoCancelamento(Value);
       Result := res;
       JSONResponse(200,res);
    finally
@@ -119,10 +117,9 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   validateAllProperties(Value,['evento']);
    emiteNFE := TEmiteNfe.Create(profile);
    try
-      res := emiteNFE.EventoCartaCorrecao(Value.GetValue<TJSONObject>('evento'));
+      res := emiteNFE.EventoCartaCorrecao(Value);
       Result := res;
       JSONResponse(200,res);
    finally
@@ -135,10 +132,9 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   validateAllProperties(Value,['inutilizacao']);
    emiteNFE := TEmiteNfe.Create(profile);
    try
-      res := emiteNFE.InutilizaNumeracao(Value.GetValue<TJSONObject>('inutilizacao'));
+      res := emiteNFE.InutilizaNumeracao(Value);
       Result := res;
       JSONResponse(200,res);
    finally

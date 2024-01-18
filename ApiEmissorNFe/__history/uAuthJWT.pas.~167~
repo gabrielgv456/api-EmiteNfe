@@ -1,0 +1,117 @@
+unit uAuthJWT;
+
+interface
+uses
+  JOSE.Producer, System.SysUtils, JOSE.Core.JWA, JOSE.Core.JWT, JSON, JOSE.Core.Builder,IdContext, uEmiteNfe;
+
+type
+   TAuthJWT = class
+   public
+      constructor Create;
+      destructor Destroy;override;
+      function createToken(key,cnpj:string):string;
+      function isTokenValid(token:string):boolean;
+      procedure DoParseAuthentication(AContext: TIdContext; const AAuthType, AAuthData: String; var VUsername, VPassword: String; var VHandled: Boolean);
+   private
+      const keyJWT = '6D490B099141E191E72EDA17CB682F1E93AE47408765C10A5014DA940CAD090823DF1CA3BA267F771851C842155C2798';
+end;
+
+implementation
+
+uses
+   JsonUtils, ServerConst1;
+
+constructor TAuthJWT.Create;
+
+begin
+   inherited Create;
+end;
+
+procedure TAuthJWT.DoParseAuthentication(AContext: TIdContext; const AAuthType, AAuthData: String; var VUsername, VPassword: String; var VHandled: Boolean);
+var FJWT : TJWT;
+begin
+    VHandled := AAuthType.Equals('Bearer') and IsTokenValid(AAuthData);
+    if not VHandled then JSONResponse(401,'{"error":"Token Invalido"}') ;
+
+end;
+
+function TAuthJWT.isTokenValid(token:string):boolean;
+var
+   LToken   : TJWT;
+   claims   : TJSONObject;
+   user, key, profilePath : string;
+begin
+   try
+      LToken := TJOSE.Verify(keyJWT,token);
+      if Assigned(LToken) then
+      begin
+         try
+            result := LToken.Verified;
+            if LToken.Claims.Issuer <> 'Smart NF API - Solução fiscal para emissão de notas de forma ágil e moderna' then
+               result:= False;
+            if LToken.Claims.Expiration > Now then
+               result:= False;
+            if Result then begin
+               claims := LToken.Claims.JSON;
+               if (not containsProperty(claims,'user')) or (not containsProperty(claims,'key')) then begin
+                  Result := False;
+                  Exit;
+               end;
+               user := claims.GetValue<string>('user');
+               key  := claims.GetValue<string>('key');
+               if (user = EmptyStr) or (key = EmptyStr) then begin
+                  Result := False;
+                  Exit;
+               end;
+               profile := key + '_' + user;
+               profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + profile + '\';
+               if (not DirectoryExists(profilePath)) then begin
+                  Result := False;
+                  Exit;
+               end;
+            end;
+         finally
+            LToken.Free;
+         end;
+      end;
+   except on E:Exception do
+      Result := False;
+   end
+end;
+
+function TAuthJWT.createToken(key,cnpj:string):string;
+var
+  LResult,profilePath: string;
+begin
+   profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + key + '_' + cnpj + '\';
+   if (not DirectoryExists(profilePath)) or (key = '') or (cnpj = '') then
+      raise Exception.Create('Chave e/ou CNPJ incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
+
+  LResult := TJOSEProcess.New
+    .SetAlgorithm(TJOSEAlgorithmId.HS256)
+
+    .SetIssuer('Smart NF API - Solução fiscal para emissão de notas de forma ágil e moderna')
+    .SetIssuedAt(Now)
+    .SetExpiration(Now + 1)
+    .SetCustomClaim('user', cnpj)
+    .SetCustomClaim('key', key)
+    .SetKey(keyJWT)
+    .Build
+    .GetCompactToken
+  ;
+   var objResult := TJSONObject.Create;
+   try
+      objResult.AddPair('tokenJWT',LResult);
+      Result := objResult.ToString;
+   finally
+      objResult.Free;
+   end;
+end;
+
+destructor TAuthJWT.Destroy;
+begin
+   inherited;
+
+end;
+
+end.
