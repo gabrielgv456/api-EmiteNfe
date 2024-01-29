@@ -12,6 +12,7 @@ type
   public
     { Public declarations }
     function updateEmiteNFE(Value: TJSONObject): string;
+    function updateEmiteNFCe(Value: TJSONObject): string;
     function updateEventoCancelamento(Value:TJSONObject): string;
     function statusServico: string;
     function consultaNF: string;
@@ -41,7 +42,7 @@ begin
    end;
 end;
 
-function TNfeController.updateEmiteNFE(Value: TJSONObject): string;
+function TNfeController.updateEmiteNFe(Value: TJSONObject): string;
 var
     emiteNFE  : TEmiteNfe;
     res : string;
@@ -55,6 +56,22 @@ begin
       if Assigned(emiteNFE) then emiteNFE.Free;
    end;
 end;
+
+function TNfeController.updateEmiteNFCe(Value: TJSONObject): string;
+var
+    emiteNFCE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFCE := TEmiteNfe.Create(profile);
+   try
+      res := emiteNFCE.GerarNFCe(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFCE) then emiteNFCE.Free;
+   end;
+end;
+
 
 function TNfeController.updateEventoCancelamento(Value:TJSONObject): string;
 var
