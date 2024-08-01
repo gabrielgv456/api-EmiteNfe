@@ -2,10 +2,6 @@ unit ServerConst1;
 
 interface
 
-var
-   profile : string;
-   isTokenValid, isBearer : Boolean;
-
 resourcestring
   sPortInUse = '- Error: Port %s already in use';
   sPortSet = '- Port set to %s';

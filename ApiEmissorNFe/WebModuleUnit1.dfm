@@ -20,7 +20,7 @@ object WebModule1: TWebModule1
   BeforeDispatch = WebModuleBeforeDispatch
   Height = 251
   Width = 486
-  PixelsPerInch = 96
+  PixelsPerInch = 120
   object DSServer1: TDSServer
     Left = 96
     Top = 11

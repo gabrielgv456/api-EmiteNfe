@@ -9,7 +9,7 @@ uses
   DataSnap.DSAuth,
   Datasnap.DSProxyJavaScript, IPPeerServer, Datasnap.DSMetadata,
   Datasnap.DSServerMetadata, Datasnap.DSClientMetadata, Datasnap.DSCommonServer,
-  Datasnap.DSHTTP;
+  Datasnap.DSHTTP, uConfig;
 
 type
   TWebModule1 = class(TWebModule)
@@ -51,6 +51,7 @@ type
 
 var
   WebModuleClass: TComponentClass = TWebModule1;
+  var GlobalConfig : TConfig;
 
 
 implementation
@@ -59,7 +60,7 @@ implementation
 
 {$R *.dfm}
 
-uses ServerMethodsUnit1, Web.WebReq, smNfe, ServerConst1;
+uses ServerMethodsUnit1, Web.WebReq, smNfe, ServerConst1, uAuthJWT;
 
 procedure TWebModule1.DSServerClass1GetClass(
   DSServerClass: TDSServerClass; var PersistentClass: TPersistentClass);
@@ -77,7 +78,7 @@ procedure TWebModule1.DSAuthenticationManagerUserAuthenticate(Sender: TObject;
   const Protocol, Context, User, Password: string; var valid: Boolean;
   UserRoles: TStrings );
 begin
-   Valid := ServerConst1.isTokenValid;
+   Valid := GlobalConfig.isTokenValid;
 end;
 
 procedure TWebModule1.ServerFunctionInvokerHTMLTag(Sender: TObject; Tag: TTag;
@@ -118,9 +119,9 @@ end;
 procedure TWebModule1.WebModuleBeforeDispatch(Sender: TObject;
   Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
 begin
-  if not ServerConst1.isBearer then ServerConst1.isTokenValid := False;
+  if not GlobalConfig.isBearer then GlobalConfig.isTokenValid := False;
   if Request.PathInfo = '/datasnap/rest/TNfeController/CreateToken' then
-    ServerConst1.isTokenValid := True;
+    GlobalConfig.isTokenValid := True;
   if FServerFunctionInvokerAction <> nil then
     FServerFunctionInvokerAction.Enabled := AllowServerFunctionInvoker;
 end;
@@ -153,8 +154,11 @@ begin
 end;
 
 initialization
+   Globalconfig := TConfig.Create;
+
 finalization
   Web.WebReq.FreeWebModules;
+
 
 end.
 

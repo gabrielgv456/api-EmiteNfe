@@ -2,12 +2,13 @@ unit smNfe;
 
 interface
 
-uses System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON, Data.DBXPlatform, Web.HTTPApp, Datasnap.DSHTTPWebBroker;
+uses uConfig,System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON, Data.DBXPlatform, Web.HTTPApp, Datasnap.DSHTTPWebBroker;
 
 type
 {$METHODINFO ON}
   TNfeController = class(TComponent)
   private
+
     { Private declarations }
   public
     { Public declarations }
@@ -19,13 +20,16 @@ type
     function updateEventoCartaCorrecao(Value:TJSONObject): string;
     function updateInutilizaNumeracao(Value:TJSONObject):string;
     function updateCreateToken(Value:TJSONObject):string;
+
   end;
 {$METHODINFO OFF}
+
+
 
 implementation
 
 
-uses System.StrUtils, uEmiteNfe, JsonUtils, uAuthJWT, ServerConst1;
+uses System.StrUtils, uEmiteNfe, JsonUtils, uAuthJWT, ServerConst1, WebModuleUnit1;
 
 
 function TNfeController.updateCreateToken(Value:TJSONObject) : string;
@@ -47,7 +51,7 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create(profile);
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
       res := emiteNFE.GerarNfe(Value);
       Result := res;
@@ -62,7 +66,7 @@ var
     emiteNFCE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFCE := TEmiteNfe.Create(profile);
+   emiteNFCE := TEmiteNfe.Create(GlobalConfig.profile);
    try
       res := emiteNFCE.GerarNFCe(Value);
       Result := res;
@@ -78,7 +82,7 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create(profile);
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
       res := emiteNFE.EventoCancelamento(Value);
       Result := res;
@@ -93,7 +97,7 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create(profile);
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
       res := emiteNFE.StatusServico;
       Result := res;
@@ -119,7 +123,7 @@ begin
        end;
    end;
    if chave = EmptyStr then raise Exception.Create('Informe corretamente o parametro "chave"');
-   emiteNFE := TEmiteNfe.Create(profile);
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
       res := emiteNFE.ConsultaNF(chave);
       Result := res;
@@ -134,7 +138,7 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create(profile);
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
       res := emiteNFE.EventoCartaCorrecao(Value);
       Result := res;
@@ -149,7 +153,7 @@ var
     emiteNFE  : TEmiteNfe;
     res : string;
 begin
-   emiteNFE := TEmiteNfe.Create(profile);
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
       res := emiteNFE.InutilizaNumeracao(Value);
       Result := res;
@@ -158,6 +162,8 @@ begin
       if Assigned(emiteNFE) then emiteNFE.Free;
    end;
 end;
+
+
 
 end.
 

@@ -2,7 +2,7 @@ unit uAuthJWT;
 
 interface
 uses
-  JOSE.Producer, System.SysUtils, JOSE.Core.JWA, JOSE.Core.JWT, JSON, JOSE.Core.Builder,IdContext, uEmiteNfe;
+  JOSE.Producer, System.SysUtils, JOSE.Core.JWA, JOSE.Core.JWT, JSON, JOSE.Core.Builder,IdContext, WebModuleUnit1;
 
 type
    TAuthJWT = class
@@ -19,7 +19,7 @@ end;
 implementation
 
 uses
-   JsonUtils, ServerConst1;
+   JsonUtils, ServerConst1, smNfe;
 
 constructor TAuthJWT.Create;
 
@@ -30,9 +30,9 @@ end;
 procedure TAuthJWT.DoParseAuthentication(AContext: TIdContext; const AAuthType, AAuthData: String; var VUsername, VPassword: String; var VHandled: Boolean);
 var FJWT : TJWT;
 begin
-    ServerConst1.isBearer := True;
+    GlobalConfig.isBearer := True;
     VHandled := AAuthType.Equals('Bearer') and IsTokenValid(AAuthData);
-    ServerConst1.isTokenValid := VHandled;
+    GlobalConfig.isTokenValid := VHandled;
     if not VHandled then JSONResponse(401,'{"error":"Token Invalido"}');
 end;
 
@@ -42,6 +42,7 @@ var
    claims   : TJSONObject;
    user, key, profilePath : string;
 begin
+   token := token.Replace('Bearer ',emptyStr);
    try
       LToken := TJOSE.Verify(keyJWT,token);
       if Assigned(LToken) then
@@ -64,8 +65,8 @@ begin
                   Result := False;
                   Exit;
                end;
-               profile := key + '_' + user;
-               profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + profile + '\';
+               GlobalConfig.profile := key + '_' + user;
+               profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + GlobalConfig.profile + '\';
                if (not DirectoryExists(profilePath)) then begin
                   Result := False;
                   Exit;

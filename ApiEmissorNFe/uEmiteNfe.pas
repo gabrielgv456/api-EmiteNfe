@@ -7,7 +7,7 @@ uses
    System.SysUtils, System.StrUtils, ACBrDFeUtil, //SHDocVw,
    ACBrUtil.FilesIO,  ACBrUtil.XMLHTML, //VCL.StdCtrls,
    ACBrDFeSSL, blcksock,System.Generics.Collections,
-   System.IniFiles, System.Classes, System.TypInfo, ACBrMail;
+   System.IniFiles, System.Classes, System.TypInfo, ACBrMail, WebModuleUnit1;
 
 type
    TEmiteNfe = class
@@ -1703,7 +1703,7 @@ end;
 destructor TEmiteNfe.Destroy;
 begin
    inherited;
-   profile := EmptyStr;
+   GlobalConfig.profile := EmptyStr;
    if Assigned(ACBrNFe) then ACBrNFe.Free;
    if Assigned(ACBrMail) then ACBrMail.Free;
 end;

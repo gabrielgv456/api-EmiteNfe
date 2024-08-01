@@ -1,0 +1,28 @@
+unit uConfig;
+
+interface
+
+
+
+type
+   TConfig = class
+   public
+
+   private
+
+
+end;
+
+implementation
+
+
+
+constructor TConfig.Create(profile:string);
+
+begin
+   inherited Create;
+end;
+
+
+
+end.
