@@ -10,6 +10,7 @@ type
    constructor Create;
    var
    profile: string;
+   cnpj: string;
    isBearer: Boolean;
    isTokenValid: Boolean;
    private

@@ -1,0 +1,192 @@
+unit smNfe;
+
+interface
+
+uses uConfig,System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON,
+Data.DBXPlatform, Web.HTTPApp, Datasnap.DSHTTPWebBroker, ACBrUtil.FilesIO;
+
+type
+{$METHODINFO ON}
+  TNfeController = class(TComponent)
+  private
+
+    { Private declarations }
+  public
+    { Public declarations }
+    function updateEmiteNFE(Value: TJSONObject): string;
+    function updateEmiteNFCe(Value: TJSONObject): string;
+    function updateEventoCancelamento(Value:TJSONObject): string;
+    function statusServico: string;
+    function consultaNF: string;
+    function updateEventoCartaCorrecao(Value:TJSONObject): string;
+    function updateInutilizaNumeracao(Value:TJSONObject):string;
+    function updateCreateToken(Value:TJSONObject):string;
+    function updateEnviaCertificado(Value:TJSONObject):string;
+
+  end;
+{$METHODINFO OFF}
+
+
+
+implementation
+
+
+uses System.StrUtils, uEmiteNfe, JsonUtils, uAuthJWT, ServerConst1, WebModuleUnit1;
+
+
+function TNfeController.updateCreateToken(Value:TJSONObject) : string;
+var
+   authJWT : TAuthJWT;
+begin
+   validateAllProperties(Value,['user','key']);
+   authJWT := TAuthJWT.Create;
+   try
+      result  := authJWT.createToken(Value.GetValue<String>('key'),Value.GetValue<String>('user'));
+      JSONResponse(200,result);
+   finally
+      if Assigned(authJWT) then authJWT.Free;
+   end;
+end;
+
+function TNfeController.updateEnviaCertificado(Value:TJSONObject):string;
+var
+    res, base64, profilePath, saveFile : string;
+    ok : Boolean;
+begin
+
+   try
+      base64 := value.GetValue<String>('base64Cert','') ;
+      if (base64 = '') then raise Exception.Create('Informe o base64Cert!');
+         profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + GlobalConfig.profile  + '\';
+      if (not DirectoryExists(profilePath)) or (GlobalConfig.profile = '') then
+         raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
+      saveFile := JsonUtils.Base64SaveFile(ok, base64, profilePath + 'cert.pfx');
+      if not ok then raise Exception.Create(saveFile);
+
+      JSONResponse(200,res);
+   finally
+
+   end;
+end;
+
+function TNfeController.updateEmiteNFe(Value: TJSONObject): string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
+   try
+      res := emiteNFE.GerarNfe(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.updateEmiteNFCe(Value: TJSONObject): string;
+var
+    emiteNFCE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFCE := TEmiteNfe.Create(GlobalConfig.profile);
+   try
+      res := emiteNFCE.GerarNFCe(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFCE) then emiteNFCE.Free;
+   end;
+end;
+
+
+function TNfeController.updateEventoCancelamento(Value:TJSONObject): string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
+   try
+      res := emiteNFE.EventoCancelamento(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.statusServico: string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
+   try
+      res := emiteNFE.StatusServico;
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.consultaNF: string;
+var
+    emiteNFE  : TEmiteNfe;
+    res , chave: string;
+    params: TDSInvocationMetadata;
+    i : integer;
+    ok:boolean;
+begin
+   params := GetInvocationMetadata;
+   for i := 0 to params.QueryParams.Count -1 do begin
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'chave' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "chave"');
+          chave :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
+   end;
+   if chave = EmptyStr then raise Exception.Create('Informe corretamente o parametro "chave"');
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
+   try
+      res := emiteNFE.ConsultaNF(chave);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.updateEventoCartaCorrecao(Value:TJSONObject): string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
+   try
+      res := emiteNFE.EventoCartaCorrecao(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+function TNfeController.updateInutilizaNumeracao(Value:TJSONObject):string;
+var
+    emiteNFE  : TEmiteNfe;
+    res : string;
+begin
+   emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
+   try
+      res := emiteNFE.InutilizaNumeracao(Value);
+      Result := res;
+      JSONResponse(200,res);
+   finally
+      if Assigned(emiteNFE) then emiteNFE.Free;
+   end;
+end;
+
+
+
+end.
+

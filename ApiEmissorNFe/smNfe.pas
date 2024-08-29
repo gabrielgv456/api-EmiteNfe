@@ -2,7 +2,8 @@ unit smNfe;
 
 interface
 
-uses uConfig,System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON, Data.DBXPlatform, Web.HTTPApp, Datasnap.DSHTTPWebBroker;
+uses uConfig,System.SysUtils, System.Classes, Datasnap.DSServer, Datasnap.DSAuth, JSON,
+Data.DBXPlatform, Web.HTTPApp, Datasnap.DSHTTPWebBroker, ACBrUtil.FilesIO;
 
 type
 {$METHODINFO ON}
@@ -20,6 +21,7 @@ type
     function updateEventoCartaCorrecao(Value:TJSONObject): string;
     function updateInutilizaNumeracao(Value:TJSONObject):string;
     function updateCreateToken(Value:TJSONObject):string;
+    function updateEnviaCertificado(Value:TJSONObject):string;
 
   end;
 {$METHODINFO OFF}
@@ -44,6 +46,23 @@ begin
    finally
       if Assigned(authJWT) then authJWT.Free;
    end;
+end;
+
+function TNfeController.updateEnviaCertificado(Value:TJSONObject):string;
+var
+    res, base64, profilePath, saveFile : string;
+    ok : Boolean;
+begin
+   base64 := value.GetValue<String>('base64Cert','') ;
+   if (base64 = '') then raise Exception.Create('Informe o base64Cert!');
+      profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + GlobalConfig.profile  + '\';
+   if (not DirectoryExists(profilePath)) or (GlobalConfig.profile = '') then
+      raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
+   if FileExists(profilePath + 'cert.pfx') then DeleteFile(profilePath + 'cert.pfx');
+
+   saveFile := JsonUtils.Base64SaveFile(ok, base64, profilePath + 'cert.pfx');
+   if not ok then raise Exception.Create(saveFile);
+   JSONResponse(200,res);
 end;
 
 function TNfeController.updateEmiteNFe(Value: TJSONObject): string;

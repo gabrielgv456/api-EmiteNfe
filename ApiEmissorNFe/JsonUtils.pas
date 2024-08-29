@@ -1,7 +1,8 @@
 unit JsonUtils;
 
 interface
-   uses Data.DBXPlatform, JSON, System.Classes, System.SysUtils, System.Generics.Collections;
+   uses Data.DBXPlatform, JSON, System.Classes, System.SysUtils, System.Generics.Collections,
+   System.NetEncoding;
 
    procedure JSONResponse(const AIDCode: Integer; const AContent: string);
    function containsProperty(Objeto: TJSONObject; chave: string): Boolean;
@@ -10,7 +11,7 @@ interface
    function generateHash : string;
    function validateAllProperties(obj : TJSONObject; propertiesObject: TArray<string>) : string;
    function textBeforeOrAfterCharacter(out ok : boolean;TextOriginal, Character: string; GetBefore: Boolean): string;
-
+   function Base64SaveFile(out ok : Boolean; base64, sArq: string) : string;
 implementation
 
 procedure JSONResponse(const AIDCode: Integer; const AContent: string);
@@ -96,6 +97,37 @@ begin
 
   Result := ResultText;
 end;
+
+
+function Base64SaveFile(out ok : Boolean; base64, sArq: string) : string;
+var
+   lInput   : TStringStream;
+   lOutput  : TMemoryStream;
+begin
+   ok := False;
+   if FileExists(sArq) then
+      DeleteFile(pchar(sArq));
+   lInput   := TStringStream.Create(base64);
+   lOutput  := TMemoryStream.Create;
+   try
+      try
+         lInput.Position := 0;
+         TNetEncoding.Base64.Decode(lInput, lOutput);
+         lOutput.SaveToFile(sArq);
+         ok := True;
+         Result := sArq;
+      except on E:Exception do
+         begin
+            ok := False;
+            Result := 'Falha ao descriptografar e/ou salvar arquivo! ' + E.Message;
+         end;
+      end;
+   finally
+      FreeAndNil(lInput);
+      FreeAndNil(lOutput);
+   end;
+end;
+
 
 
 

@@ -66,6 +66,7 @@ begin
                   Exit;
                end;
                GlobalConfig.profile := key + '_' + user;
+               GlobalConfig.cnpj := user;
                profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + GlobalConfig.profile + '\';
                if (not DirectoryExists(profilePath)) then begin
                   Result := False;
