@@ -157,6 +157,9 @@ var ok : Boolean;
 begin
    validateAllProperties(req,['chave','idLote','CNPJCPF','protocolo','justificativa','ambiente']);
 
+   ACBrNFe.Configuracoes.Certificados.Senha  := AnsiString(req.GetValue<string>('certificadoSenha'));
+   ACBRNfe.Configuracoes.WebServices.UF      := req.GetValue<String>('cUF');
+
    ACBrNFe.EventoNFe.Evento.Clear;
 
    with ACBrNFe.EventoNFe.Evento.New do
@@ -451,12 +454,12 @@ begin
      end;
 
    arrProdutos := req.GetValue<TJSONArray>('produtos');
-   var I, nItem : Integer;
-   for I := 0 to arrProdutos.Count -1 do begin
+
+   for var I := 0 to arrProdutos.Count -1 do begin
       //Adicionando Produtos
        with Det.New do
        begin
-         Prod.nItem    := nItem + 1; // Número sequencial, para cada item deve ser incrementado
+         Prod.nItem    := I + 1; // Número sequencial, para cada item deve ser incrementado
          Prod.cProd    := arrProdutos.Items[i].GetValue<String>('codigo');
          Prod.cEAN     := arrProdutos.Items[i].GetValue<String>('EAN');
          Prod.xProd    := arrProdutos.Items[i].GetValue<String>('descricao');
@@ -535,175 +538,186 @@ begin
            var reqImposto := arrProdutos.Items[i].GetValue<TJSONObject>('imposto');
            // lei da transparencia nos impostos
            vTotTrib := reqImposto.GetValue<Currency>('vTotTrib');
-           var reqICMS := reqImposto.GetValue<TJSONObject>('ICMS');
-           with ICMS do
-           begin
-             // caso o CRT seja:
-             // 1=Simples Nacional
-             // Os valores aceitos para CSOSN são:
-             // csosn101, csosn102, csosn103, csosn201, csosn202, csosn203,
-             // csosn300, csosn400, csosn500,csosn900
 
-             // 2=Simples Nacional, excesso sublimite de receita bruta;
-             // ou 3=Regime Normal.
-             // Os valores aceitos para CST são:
-             // cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
-             // cst60, cst70, cst80, cst81, cst90, cstPart10, cstPart90,
-             // cstRep41, cstVazio, cstICMSOutraUF, cstICMSSN, cstRep60
+           var reqICMS := reqImposto.GetValue<TJSONObject>('ICMS', Nil);
 
-             // (consulte o contador do seu cliente para saber qual deve ser utilizado)
-             // Pode variar de um produto para outro.
+           if reqICMS <> Nil then begin
 
-             orig    := StrToOrig(ok,reqImposto.GetValue<String>('origemMercadoria')) ;
-             if not ok then raise Exception.Create('origemMercadoria Incorreto!');
-
-             if Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then begin
-               CST := StrToCSTICMS(ok,reqICMS.GetValue<string>('CST'));
-               if not ok then raise Exception.Create('CST incorreto!')
-             end else
-               CSOSN := StrToCSOSNIcms(ok,reqICMS.GetValue<string>('CSOSN'));
-               if not ok then raise Exception.Create('CSOSN incorreto');
-
-             modBC   := StrTomodBC(Ok,reqICMS.GetValue<String>('modBC'));
-             if not ok then raise Exception.Create('modBC incorreto!');
-
-             vBC     := reqICMS.GetValue<Currency>('vBC');
-             pICMS   := reqICMS.GetValue<Currency>('pICMS');
-
-             ValorICMS := vBC * pICMS;
-
-             vICMS   := ValorICMS;
-             modBCST := dbisMargemValorAgregado;
-             pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
-             pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
-             vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
-             pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
-             vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
-             pRedBC  := reqICMS.GetValue<Currency>('pRedBC',0);
-             pCredSN := reqICMS.GetValue<Currency>('pCredSN',0);
-
-             vCredICMSSN     := reqICMS.GetValue<Currency>('vCredICMSSN',0);;
-             vBCFCPST        := reqICMS.GetValue<Currency>('vBCFCPST',0);
-             pFCPST          := reqICMS.GetValue<Currency>('pFCPST',0);
-             vFCPST          := reqICMS.GetValue<Currency>('vFCPST',0);
-             vBCSTRet        := reqICMS.GetValue<Currency>('vBCSTRet',0);
-             pST             := reqICMS.GetValue<Currency>('pST',0);
-             vICMSSubstituto := reqICMS.GetValue<Currency>('vICMSSubstituto',0);
-             vICMSSTRet      := reqICMS.GetValue<Currency>('vICMSSTRet',0);
-
-             vBCFCPSTRet := reqICMS.GetValue<Currency>('vBCFCPSTRet',0);
-             pFCPSTRet   := reqICMS.GetValue<Currency>('pFCPSTRet',0);
-             vFCPSTRet   := reqICMS.GetValue<Currency>('vFCPSTRet',0);
-             pRedBCEfet  :=  reqICMS.GetValue<Currency>('pRedBCEfet',0);
-             vBCEfet     :=  reqICMS.GetValue<Currency>('vBCEfet',0);
-             pICMSEfet   := reqICMS.GetValue<Currency>('pICMSEfet',0);
-             vICMSEfet   := reqICMS.GetValue<Currency>('vICMSEfet',0);
-
-             {
-               abaixo os campos incluidos no layout a partir da NT 2020/005
-             }
-             // Informar apenas nos motivos de desoneração documentados abaixo
-             vICMSSTDeson := reqICMS.GetValue<Currency>('vICMSSTDeson');
-             {
-               o campo abaixo só aceita os valores:
-               mdiProdutorAgropecuario, mdiOutros, mdiOrgaoFomento
-               Campo será preenchido quando o campo anterior estiver preenchido.
-             }
-             //motDesICMSST := mdiOutros;
-
-             // Percentual do diferimento do ICMS relativo ao Fundo de Combate à Pobreza (FCP).
-             // No caso de diferimento total, informar o percentual de diferimento "100"
-             pFCPDif := reqICMS.GetValue<Currency>('pFCPDif',0);
-             // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) diferido
-             vFCPDif := reqICMS.GetValue<Currency>('vFCPDif',0);
-             // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) realmente devido.
-             vFCPEfet := reqICMS.GetValue<Currency>('vFCPEfet',0);
-
-             // partilha do ICMS e fundo de probreza
-             var reqICMSUFDest := reqImposto.GetValue<TJSONObject>('ICMSUFDest');
-             with ICMSUFDest do
-             begin
-                vBCUFDest      := reqICMSUFDest.GetValue<Currency>('vBCUFDest');
-                pFCPUFDest     := reqICMSUFDest.GetValue<Currency>('pFCPUFDest');
-                pICMSUFDest    := reqICMSUFDest.GetValue<Currency>('pICMSUFDest');
-                pICMSInter     := reqICMSUFDest.GetValue<Currency>('pICMSInter');
-                pICMSInterPart := reqICMSUFDest.GetValue<Currency>('pICMSInterPart');
-                vFCPUFDest     := reqICMSUFDest.GetValue<Currency>('vFCPUFDest');
-                vICMSUFDest    := reqICMSUFDest.GetValue<Currency>('vICMSUFDest');
-                vICMSUFRemet   := reqICMSUFDest.GetValue<Currency>('vICMSUFRemet');
-             end;
-           end;
-
-           var reqPis := reqImposto.GetValue<TJSONObject>('PIS');
-           with PIS do
-           begin
-            CST  := StrToCSTPIS(ok,reqPis.GetValue<String>('CST'));
-            if not ok then raise Exception.Create('CST PIS incorreto!');
-            vBC  := reqPis.GetValue<Currency>('vBC');
-            pPIS := reqPis.GetValue<Currency>('pPIS');
-            vPIS := reqPis.GetValue<Currency>('vPIS');
-
-            //qBCProd   := reqPis.GetValue<Currency>('qBCProd');
-            //vAliqProd := reqPis.GetValue<Currency>('vAliqProd');
-            vPIS      := reqPis.GetValue<Currency>('vPIS');
-           end;
-
-           var reqPisSt := reqImposto.GetValue<TJSONObject>('PISST', Nil);
-           if reqPisSt <> Nil then begin
-              with PISST do
+              with ICMS do
               begin
-                vBc       := reqPisSt.GetValue<Currency>('vBc');
-                pPis      := reqPisSt.GetValue<Currency>('pPis');
-                qBCProd   := reqPisSt.GetValue<Currency>('qBCProd');
-                vAliqProd := reqPisSt.GetValue<Currency>('vAliqProd');
-                vPIS      := reqPisSt.GetValue<Currency>('vPIS');
+                // caso o CRT seja:
+                // 1=Simples Nacional
+                // Os valores aceitos para CSOSN são:
+                // csosn101, csosn102, csosn103, csosn201, csosn202, csosn203,
+                // csosn300, csosn400, csosn500,csosn900
+
+                // 2=Simples Nacional, excesso sublimite de receita bruta;
+                // ou 3=Regime Normal.
+                // Os valores aceitos para CST são:
+                // cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
+                // cst60, cst70, cst80, cst81, cst90, cstPart10, cstPart90,
+                // cstRep41, cstVazio, cstICMSOutraUF, cstICMSSN, cstRep60
+
+                // (consulte o contador do seu cliente para saber qual deve ser utilizado)
+                // Pode variar de um produto para outro.
+
+                orig    := StrToOrig(ok,reqImposto.GetValue<String>('origemMercadoria')) ;
+                if not ok then raise Exception.Create('origemMercadoria Incorreto!');
+
+
+                if Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then begin
+                  CST := StrToCSTICMS(ok,reqICMS.GetValue<string>('CST'));
+                  if not ok then raise Exception.Create('CST incorreto!')
+                end else
+                  CSOSN := StrToCSOSNIcms(ok,reqICMS.GetValue<string>('CSOSN'));
+                  if not ok then raise Exception.Create('CSOSN incorreto');
+
+                var modBCStr := reqICMS.GetValue<String>('modBC',emptyStr);
+                if (modBCStr <> emptyStr) then begin
+                   modBC   := StrTomodBC(Ok,modBCStr);
+                   if not ok then raise Exception.Create('modBC incorreto!');
+                end;
+
+                vBC     := reqICMS.GetValue<Currency>('vBC');
+                pICMS   := reqICMS.GetValue<Currency>('pICMS');
+
+                ValorICMS := reqICMS.GetValue<Currency>('vICMS');
+                vICMS   := ValorICMS;
+                modBCST := dbisMargemValorAgregado;
+                pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
+                pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
+                vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
+                pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
+                vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
+                pRedBC  := reqICMS.GetValue<Currency>('pRedBC',0);
+                pCredSN := reqICMS.GetValue<Currency>('pCredSN',0);
+
+                vCredICMSSN     := reqICMS.GetValue<Currency>('vCredICMSSN',0);;
+                vBCFCPST        := reqICMS.GetValue<Currency>('vBCFCPST',0);
+                pFCPST          := reqICMS.GetValue<Currency>('pFCPST',0);
+                vFCPST          := reqICMS.GetValue<Currency>('vFCPST',0);
+                vBCSTRet        := reqICMS.GetValue<Currency>('vBCSTRet',0);
+                pST             := reqICMS.GetValue<Currency>('pST',0);
+                vICMSSubstituto := reqICMS.GetValue<Currency>('vICMSSubstituto',0);
+                vICMSSTRet      := reqICMS.GetValue<Currency>('vICMSSTRet',0);
+
+                vBCFCPSTRet := reqICMS.GetValue<Currency>('vBCFCPSTRet',0);
+                pFCPSTRet   := reqICMS.GetValue<Currency>('pFCPSTRet',0);
+                vFCPSTRet   := reqICMS.GetValue<Currency>('vFCPSTRet',0);
+                pRedBCEfet  :=  reqICMS.GetValue<Currency>('pRedBCEfet',0);
+                vBCEfet     :=  reqICMS.GetValue<Currency>('vBCEfet',0);
+                pICMSEfet   := reqICMS.GetValue<Currency>('pICMSEfet',0);
+                vICMSEfet   := reqICMS.GetValue<Currency>('vICMSEfet',0);
+
                 {
-                  abaixo o campo incluido no layout a partir da NT 2020/005
+                  abaixo os campos incluidos no layout a partir da NT 2020/005
                 }
+                // Informar apenas nos motivos de desoneração documentados abaixo
+                vICMSSTDeson := reqICMS.GetValue<Currency>('vICMSSTDeson');
                 {
-                  valores aceitos pelo campo:
-                  ispNenhum, ispPISSTNaoCompoe, ispPISSTCompoe
+                  o campo abaixo só aceita os valores:
+                  mdiProdutorAgropecuario, mdiOutros, mdiOrgaoFomento
+                  Campo será preenchido quando o campo anterior estiver preenchido.
                 }
-                // Indica se o valor do PISST compõe o valor total da NF-e
-                IndSomaPISST := StrToindSomaPISST(ok,reqPisSt.GetValue<String>('indSomaPISST'));
-                if not ok then raise Exception.Create('IndSomaPISST incorreto');
+                //motDesICMSST := mdiOutros;
+
+                // Percentual do diferimento do ICMS relativo ao Fundo de Combate à Pobreza (FCP).
+                // No caso de diferimento total, informar o percentual de diferimento "100"
+                pFCPDif := reqICMS.GetValue<Currency>('pFCPDif',0);
+                // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) diferido
+                vFCPDif := reqICMS.GetValue<Currency>('vFCPDif',0);
+                // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) realmente devido.
+                vFCPEfet := reqICMS.GetValue<Currency>('vFCPEfet',0);
+
+                // partilha do ICMS e fundo de probreza
+                var reqICMSUFDest := reqImposto.GetValue<TJSONObject>('ICMSUFDest');
+                with ICMSUFDest do
+                begin
+                   vBCUFDest      := reqICMSUFDest.GetValue<Currency>('vBCUFDest');
+                   pFCPUFDest     := reqICMSUFDest.GetValue<Currency>('pFCPUFDest');
+                   pICMSUFDest    := reqICMSUFDest.GetValue<Currency>('pICMSUFDest');
+                   pICMSInter     := reqICMSUFDest.GetValue<Currency>('pICMSInter');
+                   pICMSInterPart := reqICMSUFDest.GetValue<Currency>('pICMSInterPart');
+                   vFCPUFDest     := reqICMSUFDest.GetValue<Currency>('vFCPUFDest');
+                   vICMSUFDest    := reqICMSUFDest.GetValue<Currency>('vICMSUFDest');
+                   vICMSUFRemet   := reqICMSUFDest.GetValue<Currency>('vICMSUFRemet');
+                end;
               end;
-           end;
 
-           var reqCofins := reqImposto.GetValue<TJSONObject>('COFINS',Nil);
-           if reqCofins <> Nil then begin
+              var reqPis := reqImposto.GetValue<TJSONObject>('PIS', Nil);
+              if reqPis <> Nil then begin
 
-              with COFINS do
-              begin
-                CST       := StrToCSTCOFINS(ok,reqCofins.GetValue<String>('CST'));  //cof01, cof02, cof03, cof04, cof05, cof06, cof07, cof08, cof09, cof49, cof50, cof51, cof52, cof53,
-                if not ok then raise Exception.Create('CST COFINS incorreto!');   //cof54, cof55, cof56, cof60, cof61, cof62, cof63, cof64, cof65, cof66, cof67, cof70, cof71, cof72, cof73, cof74, cof75, cof98, cof99
-                vBC       := reqCofins.GetValue<Currency>('vBC');
-                pCOFINS   := reqCofins.GetValue<Currency>('pCOFINS');
-                vCOFINS   := reqCofins.GetValue<Currency>('vCOFINS');
-                //qBCProd   := reqCofins.GetValue<Currency>('qBCProd');
-                //vAliqProd := reqCofins.GetValue<Currency>('vAliqProd');
+                 with PIS do
+                 begin
+                  CST  := StrToCSTPIS(ok,reqPis.GetValue<String>('CST'));
+                  if not ok then raise Exception.Create('CST PIS incorreto!');
+                  vBC  := reqPis.GetValue<Currency>('vBC');
+                  pPIS := reqPis.GetValue<Currency>('pPIS');
+                  vPIS := reqPis.GetValue<Currency>('vPIS');
+
+                  //qBCProd   := reqPis.GetValue<Currency>('qBCProd');
+                  //vAliqProd := reqPis.GetValue<Currency>('vAliqProd');
+                  vPIS      := reqPis.GetValue<Currency>('vPIS');
+                 end;
               end;
-           end;
 
-           var reqCofinsSt := reqImposto.GetValue<TJSONObject>('COFINSST',Nil);
-           if reqCofinsSt <> Nil then begin
-              with COFINSST do
-              begin
-                vBC       := reqCofinsSt.GetValue<Currency>('vBC');
-                pCOFINS   := reqCofinsSt.GetValue<Currency>('pCOFINS');
-                qBCProd   := reqCofinsSt.GetValue<Currency>('qBCProd');
-                vAliqProd := reqCofinsSt.GetValue<Currency>('vAliqProd');
-                vCOFINS   := reqCofinsSt.GetValue<Currency>('vCOFINS');
-                {
-                  abaixo o campo incluido no layout a partir da NT 2020/005
-                }
-                {
-                  valores aceitos pelo campo:
-                  iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe
-                }
-                // Indica se o valor da COFINS ST compõe o valor total da NF-e
-                indSomaCOFINSST :=  StrToindSomaCOFINSST(Ok,reqCofinsSt.GetValue<String>('indSomaCOFINSST')); // ['', '0', '1'],[iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe]);
-                if not ok then raise Exception.Create('indSomaCONFINSST incorreto!');
+              var reqPisSt := reqImposto.GetValue<TJSONObject>('PISST', Nil);
+              if reqPisSt <> Nil then begin
+                 with PISST do
+                 begin
+                   vBc       := reqPisSt.GetValue<Currency>('vBc');
+                   pPis      := reqPisSt.GetValue<Currency>('pPis');
+                   qBCProd   := reqPisSt.GetValue<Currency>('qBCProd');
+                   vAliqProd := reqPisSt.GetValue<Currency>('vAliqProd');
+                   vPIS      := reqPisSt.GetValue<Currency>('vPIS');
+                   {
+                     abaixo o campo incluido no layout a partir da NT 2020/005
+                   }
+                   {
+                     valores aceitos pelo campo:
+                     ispNenhum, ispPISSTNaoCompoe, ispPISSTCompoe
+                   }
+                   // Indica se o valor do PISST compõe o valor total da NF-e
+                   IndSomaPISST := StrToindSomaPISST(ok,reqPisSt.GetValue<String>('indSomaPISST'));
+                   if not ok then raise Exception.Create('IndSomaPISST incorreto');
+                 end;
+              end;
+
+              var reqCofins := reqImposto.GetValue<TJSONObject>('COFINS',Nil);
+              if reqCofins <> Nil then begin
+
+                 with COFINS do
+                 begin
+                   CST       := StrToCSTCOFINS(ok,reqCofins.GetValue<String>('CST'));  //cof01, cof02, cof03, cof04, cof05, cof06, cof07, cof08, cof09, cof49, cof50, cof51, cof52, cof53,
+                   if not ok then raise Exception.Create('CST COFINS incorreto!');   //cof54, cof55, cof56, cof60, cof61, cof62, cof63, cof64, cof65, cof66, cof67, cof70, cof71, cof72, cof73, cof74, cof75, cof98, cof99
+                   vBC       := reqCofins.GetValue<Currency>('vBC');
+                   pCOFINS   := reqCofins.GetValue<Currency>('pCOFINS');
+                   vCOFINS   := reqCofins.GetValue<Currency>('vCOFINS');
+                   //qBCProd   := reqCofins.GetValue<Currency>('qBCProd');
+                   //vAliqProd := reqCofins.GetValue<Currency>('vAliqProd');
+                 end;
+              end;
+
+              var reqCofinsSt := reqImposto.GetValue<TJSONObject>('COFINSST',Nil);
+              if reqCofinsSt <> Nil then begin
+                 with COFINSST do
+                 begin
+                   vBC       := reqCofinsSt.GetValue<Currency>('vBC');
+                   pCOFINS   := reqCofinsSt.GetValue<Currency>('pCOFINS');
+                   qBCProd   := reqCofinsSt.GetValue<Currency>('qBCProd');
+                   vAliqProd := reqCofinsSt.GetValue<Currency>('vAliqProd');
+                   vCOFINS   := reqCofinsSt.GetValue<Currency>('vCOFINS');
+                   {
+                     abaixo o campo incluido no layout a partir da NT 2020/005
+                   }
+                   {
+                     valores aceitos pelo campo:
+                     iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe
+                   }
+                   // Indica se o valor da COFINS ST compõe o valor total da NF-e
+                   indSomaCOFINSST :=  StrToindSomaCOFINSST(Ok,reqCofinsSt.GetValue<String>('indSomaCOFINSST')); // ['', '0', '1'],[iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe]);
+                   if not ok then raise Exception.Create('indSomaCONFINSST incorreto!');
+                 end;
               end;
            end;
          end;
@@ -711,20 +725,21 @@ begin
    end;
     var reqTotal := req.GetValue<TJSONObject>('total');
     var reqTotalICMS := reqTotal.GetValue<TJSONObject>('ICMS');
-    Total.ICMSTot.vBC     := reqTotalICMS.GetValue<Currency>('vBC');
-    Total.ICMSTot.vICMS   := reqTotalICMS.GetValue<Currency>('vICMS');
-    Total.ICMSTot.vBCST   := reqTotalICMS.GetValue<Currency>('vBCST');
-    Total.ICMSTot.vST     := reqTotalICMS.GetValue<Currency>('vST');
-    Total.ICMSTot.vProd   := reqTotalICMS.GetValue<Currency>('vProd');
-    Total.ICMSTot.vFrete  := reqTotalICMS.GetValue<Currency>('vFrete');
-    Total.ICMSTot.vSeg    := reqTotalICMS.GetValue<Currency>('vSeg');
-    Total.ICMSTot.vDesc   := reqTotalICMS.GetValue<Currency>('vDesc');
-    Total.ICMSTot.vII     := reqTotalICMS.GetValue<Currency>('vII');
-    Total.ICMSTot.vIPI    := reqTotalICMS.GetValue<Currency>('vIPI');
-    Total.ICMSTot.vPIS    := reqTotalICMS.GetValue<Currency>('vPIS');
-    Total.ICMSTot.vCOFINS := reqTotalICMS.GetValue<Currency>('vCOFINS');
-    Total.ICMSTot.vOutro  := reqTotalICMS.GetValue<Currency>('vOutro');
-    Total.ICMSTot.vNF     := reqTotalICMS.GetValue<Currency>('vNF');
+    Total.ICMSTot.vBC      := reqTotalICMS.GetValue<Currency>('vBC');
+    Total.ICMSTot.vICMS    := reqTotalICMS.GetValue<Currency>('vICMS');
+    Total.ICMSTot.vBCST    := reqTotalICMS.GetValue<Currency>('vBCST');
+    Total.ICMSTot.vST      := reqTotalICMS.GetValue<Currency>('vST');
+    Total.ICMSTot.vProd    := reqTotalICMS.GetValue<Currency>('vProd');
+    Total.ICMSTot.vFrete   := reqTotalICMS.GetValue<Currency>('vFrete');
+    Total.ICMSTot.vSeg     := reqTotalICMS.GetValue<Currency>('vSeg');
+    Total.ICMSTot.vDesc    := reqTotalICMS.GetValue<Currency>('vDesc');
+    Total.ICMSTot.vII      := reqTotalICMS.GetValue<Currency>('vII');
+    Total.ICMSTot.vIPI     := reqTotalICMS.GetValue<Currency>('vIPI');
+    Total.ICMSTot.vPIS     := reqTotalICMS.GetValue<Currency>('vPIS');
+    Total.ICMSTot.vCOFINS  := reqTotalICMS.GetValue<Currency>('vCOFINS');
+    Total.ICMSTot.vOutro   := reqTotalICMS.GetValue<Currency>('vOutro');
+    Total.ICMSTot.vNF      := reqTotalICMS.GetValue<Currency>('vNF');
+    Total.ICMSTot.vTotTrib := reqTotalICMS.GetValue<Currency>('vTotTrib');
 
     // partilha do icms e fundo de probreza
     Total.ICMSTot.vFCPUFDest   := reqTotalICMS.GetValue<Currency>('vFCPUFDest');
@@ -752,23 +767,40 @@ begin
     Transp.modFrete := mfSemFrete; // NFC-e não pode ter FRETE
 
     var reqArrPagamento := req.GetValue<TJSONArray>('pagamento');
-    for I := 0 to reqArrPagamento.Count -1 do begin
-      with pag.New do
-      begin
-        indPag := StrToIndpag(ok,reqArrPagamento.Items[i].GetValue<String>('condicao',emptyStr)); //StrToEnumerado(ok, s, ['0', '1', '2', ''], [ipVista, ipPrazo, ipOutras, ipNenhum]);
-           if not ok then raise Exception.Create('condicao pagamento incorreto!');
+    for var I := 0 to reqArrPagamento.Count -1 do begin
+       with pag.New do
+       begin
+          indPag := StrToIndpag(ok,reqArrPagamento.Items[i].GetValue<String>('condicao',emptyStr)); //StrToEnumerado(ok, s, ['0', '1', '2', ''], [ipVista, ipPrazo, ipOutras, ipNenhum]);
+             if not ok then raise Exception.Create('condicao pagamento incorreto!');
 
-        tPag   := StrToFormaPagamento(Ok,reqArrPagamento.Items[i].GetValue<String>('forma'));
+          tPag := StrToFormaPagamento(Ok,reqArrPagamento.Items[i].GetValue<String>('forma'));
           if not ok then raise Exception.Create('forma pagamento incorreto!');
-        {
-          abaixo o campo incluido no layout a partir da NT 2020/006
-        }
-        {
-          se tPag for fpOutro devemos incluir o campo xPag
-        xPag := 'Caderneta';
-        }
+
+          if reqArrPagamento.Items[i].GetValue<Boolean>('integrado',false) then begin
+             tpIntegra := StrTotpIntegra(Ok,reqArrPagamento.Items[i].GetValue<String>('tipoIntegracao')); // ['', '1', '2'], [tiNaoInformado, tiPagIntegrado, tiPagNaoIntegrado]);
+             if not ok then raise Exception.Create('tipoIntegracao incorreto!');
+             CNPJ      := reqArrPagamento.Items[i].GetValue<String>('CNPJ');
+             tBand     := StrToBandeiraCartao(ok,reqArrPagamento.Items[i].GetValue<String>('bandeiraCartao'));
+             {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16',
+             '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '99', ''],[bcVisa, bcMasterCard, bcAmericanExpress, bcSorocred,
+             bcDinersClub, bcElo, bcHipercard, bcAura, bcCabal,bcAlelo, bcBanesCard, bcCalCard, bcCredz, bcDiscover,
+             bcGoodCard, bcGreenCard, bcHiper, bcJcB, bcMais, bcMaxVan, bcPolicard, bcRedeCompras, bcSodexo,
+             bcValeCard, bcVerocheque, bcVR, bcTicket, bcOutros, TpcnBandeiraCartao(-1)]);}
+             if not ok then raise Exception.Create('bandeiraCartao incorreto!');
+             cAut      := reqArrPagamento.Items[i].GetValue<String>('codAutorizacao')
+          end else tpIntegra := TtpIntegra.tiPagNaoIntegrado;
+
           vPag   := reqArrPagamento.Items[i].GetValue<Currency>('valor');
-      end;
+
+          {
+           abaixo o campo incluido no layout a partir da NT 2020/006
+          }
+          {
+           se tPag for fpOutro devemos incluir o campo xPag
+           xPag := 'Caderneta';
+          }
+
+       end;
     end;
 
 
@@ -782,7 +814,7 @@ begin
 
     var arrReqObsComplementar := reqInfAdicional.GetValue<TJSONArray>('obsComplementar', Nil);
     if arrReqObsComplementar <> Nil then begin
-       for i := 0 to arrReqObsComplementar.Count -1 do begin
+       for var i := 0 to arrReqObsComplementar.Count -1 do begin
           with InfAdic.obsCont.New do
           begin
             xCampo := arrReqObsComplementar.Items[I].GetValue<String>('campo');
@@ -793,7 +825,7 @@ begin
 
     var arrReqObsFisco := reqInfAdicional.GetValue<TJSONArray>('obsFisco', Nil);
     if arrReqObsFisco <> Nil then begin
-       for i := 0 to arrReqObsFisco.Count -1 do begin
+       for var i := 0 to arrReqObsFisco.Count -1 do begin
           with InfAdic.obsFisco.New do
           begin
              xCampo := arrReqObsFisco.Items[I].GetValue<String>('campo');
@@ -1018,11 +1050,11 @@ begin
    end;
 
    arrProdutos := req.GetValue<TJSONArray>('produtos');
-   var I, nItem : Integer;
-   for I := 0 to arrProdutos.Count -1 do begin
+
+   for var I := 0 to arrProdutos.Count -1 do begin
       //Adicionando Produtos
       Produto := NotaF.NFe.Det.New;
-      Produto.Prod.nItem    := nItem + 1; // Número sequencial, para cada item deve ser incrementado
+      Produto.Prod.nItem    := I + 1; // Número sequencial, para cada item deve ser incrementado
       Produto.Prod.cProd    := arrProdutos.Items[i].GetValue<String>('codigo');
       Produto.Prod.cEAN     := arrProdutos.Items[i].GetValue<String>('EAN');
       Produto.Prod.xProd    := arrProdutos.Items[i].GetValue<String>('descricao');
@@ -1196,263 +1228,269 @@ begin
          var reqImposto := arrProdutos.Items[i].GetValue<TJSONObject>('imposto');
          // lei da transparencia nos impostos
          vTotTrib := reqImposto.GetValue<Currency>('vTotTrib');
-         var reqICMS := reqImposto.GetValue<TJSONObject>('ICMS');
-         with ICMS do
-         begin
-            // caso o CRT seja:
-            // 1=Simples Nacional
-            // Os valores aceitos para CSOSN são:
-            // csosn101, csosn102, csosn103, csosn201, csosn202, csosn203,
-            // csosn300, csosn400, csosn500,csosn900
+         var reqICMS := reqImposto.GetValue<TJSONObject>('ICMS', Nil);
+         if reqICMS <> Nil then begin
 
-            // 2=Simples Nacional, excesso sublimite de receita bruta;
-            // ou 3=Regime Normal.
-            // Os valores aceitos para CST são:
-            // cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
-            // cst60, cst70, cst80, cst81, cst90, cstPart10, cstPart90,
-            // cstRep41, cstVazio, cstICMSOutraUF, cstICMSSN, cstRep60
-
-            // (consulte o contador do seu cliente para saber qual deve ser utilizado)
-            // Pode variar de um produto para outro.
-
-            orig := StrToOrig(ok,reqImposto.GetValue<String>('origemMercadoria')) ;
-            if not ok then raise Exception.Create('origemMercadoria incorreto!');
-
-            { orig = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ''],
-            [oeNacional, oeEstrangeiraImportacaoDireta, oeEstrangeiraAdquiridaBrasil,
-            oeNacionalConteudoImportacaoSuperior40, oeNacionalProcessosBasicos,
-            oeNacionalConteudoImportacaoInferiorIgual40,
-            oeEstrangeiraImportacaoDiretaSemSimilar, oeEstrangeiraAdquiridaBrasilSemSimilar,
-            oeNacionalConteudoImportacaoSuperior70, oeReservadoParaUsoFuturo,
-            oeVazio]); }
-
-            //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
-            (*
-            CST       := cst02;
-            qBCMono   := 100;
-            adRemICMS := 10;
-            vICMSMono := 10;
-            *)
-            //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
-            (*
-            CST          := cst15;
-            qBCMono      := 100;
-            adRemICMS    := 10;
-            vICMSMono    := 10;
-            qBCMonoReten := 100;
-            adRemICMSReten := 10;
-            vICMSMonoReten := 10;
-            pRedAdRem      := 10;
-            motRedAdRem    := TmotRedAdRem.motTranspColetivo;
-            *)
-            //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
-            (*
-            CST           := cst53;
-            qBCMono       := 100;
-            adRemICMS     := 10;
-            vICMSMonoOp   := 10;
-            pDif          := 10;
-            vICMSMonoDif  := 1;
-            vICMSMono     := 10;
-            *)
-            //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
-            (*
-            CST           := cst61;
-            qBCMonoRet    := 100;
-            adRemICMSRet  := 10;
-            vICMSMonoRet  := 10;
-            *)
-
-            if NotaF.NFe.Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then
+            with ICMS do
             begin
-               CST  := StrToCSTICMS(ok,reqICMS.GetValue<string>('CST'));
-               if not ok then raise Exception.Create('CST incorreto!');
-               { ['', '00', '10', '20', '30', '40', '41', '45', '50', '51',
-                                  '60', '70', '80', '81', '90', '90', 'SN',
-                                  '10', '90', '41', '60', '02', '15', '53', '61'],
-                                 [cstVazio, cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
-                                 cst60, cst70, cst80, cst81, cst90, cstICMSOutraUF, cstICMSSN,
-                                 cstPart10, cstPart90, cstRep41, cstRep60,
-                                 cst02, cst15, cst53, cst61]);}
-               modBC   := StrTomodBC(Ok,reqICMS.GetValue<String>('modBC'));  //['0', '1', '2', '3', '']
-               if not ok then raise Exception.Create('modBC incorreto!');
-               vBC     := reqICMS.GetValue<Currency>('vBC');
-               pICMS   := reqICMS.GetValue<Currency>('pICMS');
-               vICMS   := reqICMS.GetValue<Currency>('vICMS');
-               modBCST := dbisMargemValorAgregado;
-               pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
-               pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
-               vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
-               pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
-               vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
-               pRedBC  := reqICMS.GetValue<Currency>('pRedBC');
-            end
-            else
-            begin
-               CSOSN   := StrToCSOSNIcms(ok,reqICMS.GetValue<string>('CSOSN')); // [ '','101', '102', '103', '201', '202', '203', '300', '400', '500','900'], [csosnVazio, csosn101, csosn102, csosn103, csosn201, csosn202, csosn203, csosn300, csosn400, csosn500,csosn900]);
-               if not ok then raise Exception.Create('CSOSN incorreto');
-               modBC   := dbiValorOperacao;
-               pCredSN := reqICMS.GetValue<Currency>('pCredSN',0);
-               vCredICMSSN := 100 * pCredSN / 100;;
-               vBC     := reqICMS.GetValue<Currency>('vBC');
-               pICMS   := reqICMS.GetValue<Currency>('pICMS');
-               vICMS   := reqICMS.GetValue<Currency>('vICMS');
-               modBCST := dbisListaNeutra;
-               pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
-               pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
-               vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
-               pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
-               vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
+               // caso o CRT seja:
+               // 1=Simples Nacional
+               // Os valores aceitos para CSOSN são:
+               // csosn101, csosn102, csosn103, csosn201, csosn202, csosn203,
+               // csosn300, csosn400, csosn500,csosn900
+
+               // 2=Simples Nacional, excesso sublimite de receita bruta;
+               // ou 3=Regime Normal.
+               // Os valores aceitos para CST são:
+               // cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
+               // cst60, cst70, cst80, cst81, cst90, cstPart10, cstPart90,
+               // cstRep41, cstVazio, cstICMSOutraUF, cstICMSSN, cstRep60
+
+               // (consulte o contador do seu cliente para saber qual deve ser utilizado)
+               // Pode variar de um produto para outro.
+
+               orig := StrToOrig(ok,reqImposto.GetValue<String>('origemMercadoria')) ;
+               if not ok then raise Exception.Create('origemMercadoria incorreto!');
+
+               { orig = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ''],
+               [oeNacional, oeEstrangeiraImportacaoDireta, oeEstrangeiraAdquiridaBrasil,
+               oeNacionalConteudoImportacaoSuperior40, oeNacionalProcessosBasicos,
+               oeNacionalConteudoImportacaoInferiorIgual40,
+               oeEstrangeiraImportacaoDiretaSemSimilar, oeEstrangeiraAdquiridaBrasilSemSimilar,
+               oeNacionalConteudoImportacaoSuperior70, oeReservadoParaUsoFuturo,
+               oeVazio]); }
+
+               //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
+               (*
+               CST       := cst02;
+               qBCMono   := 100;
+               adRemICMS := 10;
+               vICMSMono := 10;
+               *)
+               //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
+               (*
+               CST          := cst15;
+               qBCMono      := 100;
+               adRemICMS    := 10;
+               vICMSMono    := 10;
+               qBCMonoReten := 100;
+               adRemICMSReten := 10;
+               vICMSMonoReten := 10;
+               pRedAdRem      := 10;
+               motRedAdRem    := TmotRedAdRem.motTranspColetivo;
+               *)
+               //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
+               (*
+               CST           := cst53;
+               qBCMono       := 100;
+               adRemICMS     := 10;
+               vICMSMonoOp   := 10;
+               pDif          := 10;
+               vICMSMonoDif  := 1;
+               vICMSMono     := 10;
+               *)
+               //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
+               (*
+               CST           := cst61;
+               qBCMonoRet    := 100;
+               adRemICMSRet  := 10;
+               vICMSMonoRet  := 10;
+               *)
+
+               if NotaF.NFe.Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then
+               begin
+                  CST  := StrToCSTICMS(ok,reqICMS.GetValue<string>('CST'));
+                  if not ok then raise Exception.Create('CST incorreto!');
+                  { ['', '00', '10', '20', '30', '40', '41', '45', '50', '51',
+                                     '60', '70', '80', '81', '90', '90', 'SN',
+                                     '10', '90', '41', '60', '02', '15', '53', '61'],
+                                    [cstVazio, cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
+                                    cst60, cst70, cst80, cst81, cst90, cstICMSOutraUF, cstICMSSN,
+                                    cstPart10, cstPart90, cstRep41, cstRep60,
+                                    cst02, cst15, cst53, cst61]);}
+                  modBC   := StrTomodBC(Ok,reqICMS.GetValue<String>('modBC'));  //['0', '1', '2', '3', '']
+                  if not ok then raise Exception.Create('modBC incorreto!');
+                  vBC     := reqICMS.GetValue<Currency>('vBC');
+                  pICMS   := reqICMS.GetValue<Currency>('pICMS');
+                  vICMS   := reqICMS.GetValue<Currency>('vICMS');
+                  modBCST := dbisMargemValorAgregado;
+                  pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
+                  pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
+                  vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
+                  pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
+                  vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
+                  pRedBC  := reqICMS.GetValue<Currency>('pRedBC');
+               end
+               else
+               begin
+                  CSOSN   := StrToCSOSNIcms(ok,reqICMS.GetValue<string>('CSOSN')); // [ '','101', '102', '103', '201', '202', '203', '300', '400', '500','900'], [csosnVazio, csosn101, csosn102, csosn103, csosn201, csosn202, csosn203, csosn300, csosn400, csosn500,csosn900]);
+                  if not ok then raise Exception.Create('CSOSN incorreto');
+                  modBC   := dbiValorOperacao;
+                  pCredSN := reqICMS.GetValue<Currency>('pCredSN',0);
+                  vCredICMSSN := 100 * pCredSN / 100;;
+                  vBC     := reqICMS.GetValue<Currency>('vBC');
+                  pICMS   := reqICMS.GetValue<Currency>('pICMS');
+                  vICMS   := reqICMS.GetValue<Currency>('vICMS');
+                  modBCST := dbisListaNeutra;
+                  pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
+                  pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
+                  vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
+                  pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
+                  vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
+               end;
+
+               vBCFCPST        := reqICMS.GetValue<Currency>('vBCFCPST',0);
+               pFCPST          := reqICMS.GetValue<Currency>('pFCPST',0);
+               vFCPST          := reqICMS.GetValue<Currency>('vFCPST',0);
+               vBCSTRet        := reqICMS.GetValue<Currency>('vBCSTRet',0);
+               pST             := reqICMS.GetValue<Currency>('pST',0);
+               vICMSSubstituto := reqICMS.GetValue<Currency>('vICMSSubstituto',0);
+               vICMSSTRet      := reqICMS.GetValue<Currency>('vICMSSTRet',0);
+               vBCFCPSTRet     := reqICMS.GetValue<Currency>('vBCFCPSTRet',0);
+               pFCPSTRet       := reqICMS.GetValue<Currency>('pFCPSTRet',0);
+               vFCPSTRet       := reqICMS.GetValue<Currency>('vFCPSTRet',0);
+               pRedBCEfet      := reqICMS.GetValue<Currency>('pRedBCEfet',0);
+               vBCEfet         := reqICMS.GetValue<Currency>('vBCEfet',0);
+               pICMSEfet       := reqICMS.GetValue<Currency>('pICMSEfet',0);
+               vICMSEfet       := reqICMS.GetValue<Currency>('vICMSEfet',0);
+               pFCP            := reqIcms.GetValue<Integer>('pFCP',0);
+               vFCP            := reqIcms.GetValue<Currency>('vFCP',0);
+               motDesICMS      := StrTomotDesICMS(ok,reqIcms.GetValue<String>('motDesICMS'));
+               {
+                 abaixo os campos incluidos no layout a partir da NT 2020/005
+               }
+               // Informar apenas nos motivos de desoneração documentados abaixo
+               vICMSSTDeson := reqICMS.GetValue<Currency>('vICMSSTDeson',0);
+               {
+                 o campo abaixo só aceita os valores:
+                 mdiProdutorAgropecuario, mdiOutros, mdiOrgaoFomento
+                 Campo será preenchido quando o campo anterior estiver preenchido.
+               }
+               //motDesICMSST := mdiOutros;
+
+               // Percentual do diferimento do ICMS relativo ao Fundo de Combate à Pobreza (FCP).
+               // No caso de diferimento total, informar o percentual de diferimento "100"
+               pFCPDif := reqICMS.GetValue<Currency>('pFCPDif',0);
+               // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) diferido
+               vFCPDif := reqICMS.GetValue<Currency>('vFCPDif',0);
+               // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) realmente devido.
+               vFCPEfet := reqICMS.GetValue<Currency>('vFCPEfet',0);
             end;
 
-            vBCFCPST        := reqICMS.GetValue<Currency>('vBCFCPST',0);
-            pFCPST          := reqICMS.GetValue<Currency>('pFCPST',0);
-            vFCPST          := reqICMS.GetValue<Currency>('vFCPST',0);
-            vBCSTRet        := reqICMS.GetValue<Currency>('vBCSTRet',0);
-            pST             := reqICMS.GetValue<Currency>('pST',0);
-            vICMSSubstituto := reqICMS.GetValue<Currency>('vICMSSubstituto',0);
-            vICMSSTRet      := reqICMS.GetValue<Currency>('vICMSSTRet',0);
-            vBCFCPSTRet     := reqICMS.GetValue<Currency>('vBCFCPSTRet',0);
-            pFCPSTRet       := reqICMS.GetValue<Currency>('pFCPSTRet',0);
-            vFCPSTRet       := reqICMS.GetValue<Currency>('vFCPSTRet',0);
-            pRedBCEfet      := reqICMS.GetValue<Currency>('pRedBCEfet',0);
-            vBCEfet         := reqICMS.GetValue<Currency>('vBCEfet',0);
-            pICMSEfet       := reqICMS.GetValue<Currency>('pICMSEfet',0);
-            vICMSEfet       := reqICMS.GetValue<Currency>('vICMSEfet',0);
-            pFCP            := reqIcms.GetValue<Integer>('pFCP',0);
-            vFCP            := reqIcms.GetValue<Currency>('vFCP',0);
-            motDesICMS      := StrTomotDesICMS(ok,reqIcms.GetValue<String>('motDesICMS'));
-            {
-              abaixo os campos incluidos no layout a partir da NT 2020/005
-            }
-            // Informar apenas nos motivos de desoneração documentados abaixo
-            vICMSSTDeson := reqICMS.GetValue<Currency>('vICMSSTDeson',0);
-            {
-              o campo abaixo só aceita os valores:
-              mdiProdutorAgropecuario, mdiOutros, mdiOrgaoFomento
-              Campo será preenchido quando o campo anterior estiver preenchido.
-            }
-            //motDesICMSST := mdiOutros;
-
-            // Percentual do diferimento do ICMS relativo ao Fundo de Combate à Pobreza (FCP).
-            // No caso de diferimento total, informar o percentual de diferimento "100"
-            pFCPDif := reqICMS.GetValue<Currency>('pFCPDif',0);
-            // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) diferido
-            vFCPDif := reqICMS.GetValue<Currency>('vFCPDif',0);
-            // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) realmente devido.
-            vFCPEfet := reqICMS.GetValue<Currency>('vFCPEfet',0);
-         end;
-
-         var reqICMSUFDest := reqImposto.GetValue<TJSONObject>('ICMSUFDest');
-         with ICMSUFDest do
-         begin
-            // partilha do ICMS e fundo de probreza
-            vBCUFDest      := reqICMSUFDest.GetValue<Currency>('vBCUFDest');
-            pFCPUFDest     := reqICMSUFDest.GetValue<Currency>('pFCPUFDest');
-            pICMSUFDest    := reqICMSUFDest.GetValue<Currency>('pICMSUFDest');
-            pICMSInter     := reqICMSUFDest.GetValue<Currency>('pICMSInter');
-            pICMSInterPart := reqICMSUFDest.GetValue<Currency>('pICMSInterPart');
-            vFCPUFDest     := reqICMSUFDest.GetValue<Currency>('vFCPUFDest');
-            vICMSUFDest    := reqICMSUFDest.GetValue<Currency>('vICMSUFDest');
-            vICMSUFRemet   := reqICMSUFDest.GetValue<Currency>('vICMSUFRemet');
-         end;
-
-         var reqIPI := reqImposto.GetValue<TJSONObject>('IPI', Nil);
-         if reqIPI <> Nil then begin
-            with IPI do begin
-               CST      := StrToCSTIPI(ok, reqIPI.GetValue<String>('CST')); // ['00', '49', '50', '99', '01', '02', '03', '04', '05', '51', '52', '53', '54', '55'],
-               if not ok then raise Exception.Create('CST IPI incorreto!');
-               clEnq    := reqIPI.GetValue<String>('clEnq');
-               CNPJProd := reqIPI.GetValue<String>('CNPJProd');
-               cSelo    := reqIPI.GetValue<String>('cSelo');
-               qSelo    := reqIPI.GetValue<Integer>('qSelo');
-               cEnq     := reqIPI.GetValue<String>('cEnq');
-               vBC      := reqIPI.GetValue<Currency>('vBC');
-               pIPI     := reqIPI.GetValue<Currency>('pIPI');
-               vIPI     := reqIPI.GetValue<Currency>('vIPI');
-               qUnid    := reqIPI.GetValue<Currency>('qUnid',0);
-               vUnid    := reqIPI.GetValue<Currency>('vUnid',0);
-            end;
-         end;
-
-         var reqII := reqImposto.GetValue<TJSONObject>('II', Nil);
-         if reqII <> Nil then begin
-            with II do
+            var reqICMSUFDest := reqImposto.GetValue<TJSONObject>('ICMSUFDest');
+            with ICMSUFDest do
             begin
-               II.vBc      :=  reqII.GetValue<Currency>('vBc');
-               II.vDespAdu :=  reqII.GetValue<Currency>('vDespAdu');
-               II.vII      :=  reqII.GetValue<Currency>('vII');
-               II.vIOF     :=  reqII.GetValue<Currency>('vIOF');
+               // partilha do ICMS e fundo de probreza
+               vBCUFDest      := reqICMSUFDest.GetValue<Currency>('vBCUFDest');
+               pFCPUFDest     := reqICMSUFDest.GetValue<Currency>('pFCPUFDest');
+               pICMSUFDest    := reqICMSUFDest.GetValue<Currency>('pICMSUFDest');
+               pICMSInter     := reqICMSUFDest.GetValue<Currency>('pICMSInter');
+               pICMSInterPart := reqICMSUFDest.GetValue<Currency>('pICMSInterPart');
+               vFCPUFDest     := reqICMSUFDest.GetValue<Currency>('vFCPUFDest');
+               vICMSUFDest    := reqICMSUFDest.GetValue<Currency>('vICMSUFDest');
+               vICMSUFRemet   := reqICMSUFDest.GetValue<Currency>('vICMSUFRemet');
             end;
-         end;
 
-         var reqPis := reqImposto.GetValue<TJSONObject>('PIS');
-         with PIS do
-         begin
-            CST  := StrToCSTPIS(ok,reqPis.GetValue<String>('CST'));
-            if not ok then raise Exception.Create('CST PIS incorreto!');
-            vBC  := reqPis.GetValue<Currency>('vBC');
-            pPIS := reqPis.GetValue<Currency>('pPIS');
-            vPIS := reqPis.GetValue<Currency>('vPIS');
-            vPIS := reqPis.GetValue<Currency>('vPIS');
-            //qBCProd   := reqPis.GetValue<Currency>('qBCProd');
-            //vAliqProd := reqPis.GetValue<Currency>('vAliqProd');
-
-         end;
-
-         var reqPisSt := reqImposto.GetValue<TJSONObject>('PISST', Nil);
-         if reqPisSt <> Nil then begin
-            with PISST do
-            begin
-               vBc       := reqPisSt.GetValue<Currency>('vBc');
-               pPis      := reqPisSt.GetValue<Currency>('pPis');
-               qBCProd   := reqPisSt.GetValue<Currency>('qBCProd');
-               vAliqProd := reqPisSt.GetValue<Currency>('vAliqProd');
-               vPIS      := reqPisSt.GetValue<Currency>('vPIS');
-               {
-                 abaixo o campo incluido no layout a partir da NT 2020/005
-               }
-               {
-                 valores aceitos pelo campo:
-                 ispNenhum, ispPISSTNaoCompoe, ispPISSTCompoe
-               }
-               // Indica se o valor do PISST compõe o valor total da NF-e
-               IndSomaPISST := StrToindSomaPISST(ok,reqPisSt.GetValue<String>('indSomaPISST'));
-               if not ok then raise Exception.Create('IndSomaPISST incorreto');
+            var reqIPI := reqImposto.GetValue<TJSONObject>('IPI', Nil);
+            if reqIPI <> Nil then begin
+               with IPI do begin
+                  CST      := StrToCSTIPI(ok, reqIPI.GetValue<String>('CST')); // ['00', '49', '50', '99', '01', '02', '03', '04', '05', '51', '52', '53', '54', '55'],
+                  if not ok then raise Exception.Create('CST IPI incorreto!');
+                  clEnq    := reqIPI.GetValue<String>('clEnq');
+                  CNPJProd := reqIPI.GetValue<String>('CNPJProd');
+                  cSelo    := reqIPI.GetValue<String>('cSelo');
+                  qSelo    := reqIPI.GetValue<Integer>('qSelo');
+                  cEnq     := reqIPI.GetValue<String>('cEnq');
+                  vBC      := reqIPI.GetValue<Currency>('vBC');
+                  pIPI     := reqIPI.GetValue<Currency>('pIPI');
+                  vIPI     := reqIPI.GetValue<Currency>('vIPI');
+                  qUnid    := reqIPI.GetValue<Currency>('qUnid',0);
+                  vUnid    := reqIPI.GetValue<Currency>('vUnid',0);
+               end;
             end;
-         end;
 
-         var reqCofins := reqImposto.GetValue<TJSONObject>('COFINS');
-         with COFINS do
-         begin
-            CST     := StrToCSTCOFINS(ok,reqCofins.GetValue<String>('CST'));  //cof01, cof02, cof03, cof04, cof05, cof06, cof07, cof08, cof09, cof49, cof50, cof51, cof52, cof53,
-            if not ok then raise Exception.Create('CST COFINS incorreto!');   //cof54, cof55, cof56, cof60, cof61, cof62, cof63, cof64, cof65, cof66, cof67, cof70, cof71, cof72, cof73, cof74, cof75, cof98, cof99
-            vBC     := reqCofins.GetValue<Currency>('vBC');
-            pCOFINS := reqCofins.GetValue<Currency>('pCOFINS');
-            vCOFINS := reqCofins.GetValue<Currency>('vCOFINS');
-            //qBCProd   := reqCofins.GetValue<Currency>('qBCProd');
-            //vAliqProd := reqCofins.GetValue<Currency>('vAliqProd');
-         end;
+            var reqII := reqImposto.GetValue<TJSONObject>('II', Nil);
+            if reqII <> Nil then begin
+               with II do
+               begin
+                  II.vBc      :=  reqII.GetValue<Currency>('vBc');
+                  II.vDespAdu :=  reqII.GetValue<Currency>('vDespAdu');
+                  II.vII      :=  reqII.GetValue<Currency>('vII');
+                  II.vIOF     :=  reqII.GetValue<Currency>('vIOF');
+               end;
+            end;
 
-         var reqCofinsSt := reqImposto.GetValue<TJSONObject>('COFINSST',Nil);
-         if reqCofinsSt <> Nil then begin
-            with COFINSST do
+            var reqPis := reqImposto.GetValue<TJSONObject>('PIS', Nil);
+            if reqPis <> Nil then begin
+
+               with PIS do
+               begin
+                  CST  := StrToCSTPIS(ok,reqPis.GetValue<String>('CST'));
+                  if not ok then raise Exception.Create('CST PIS incorreto!');
+                  vBC  := reqPis.GetValue<Currency>('vBC');
+                  pPIS := reqPis.GetValue<Currency>('pPIS');
+                  vPIS := reqPis.GetValue<Currency>('vPIS');
+                  vPIS := reqPis.GetValue<Currency>('vPIS');
+                  //qBCProd   := reqPis.GetValue<Currency>('qBCProd');
+                  //vAliqProd := reqPis.GetValue<Currency>('vAliqProd');
+
+               end;
+            end;
+
+            var reqPisSt := reqImposto.GetValue<TJSONObject>('PISST', Nil);
+            if reqPisSt <> Nil then begin
+               with PISST do
+               begin
+                  vBc       := reqPisSt.GetValue<Currency>('vBc');
+                  pPis      := reqPisSt.GetValue<Currency>('pPis');
+                  qBCProd   := reqPisSt.GetValue<Currency>('qBCProd');
+                  vAliqProd := reqPisSt.GetValue<Currency>('vAliqProd');
+                  vPIS      := reqPisSt.GetValue<Currency>('vPIS');
+                  {
+                    abaixo o campo incluido no layout a partir da NT 2020/005
+                  }
+                  {
+                    valores aceitos pelo campo:
+                    ispNenhum, ispPISSTNaoCompoe, ispPISSTCompoe
+                  }
+                  // Indica se o valor do PISST compõe o valor total da NF-e
+                  IndSomaPISST := StrToindSomaPISST(ok,reqPisSt.GetValue<String>('indSomaPISST'));
+                  if not ok then raise Exception.Create('IndSomaPISST incorreto');
+               end;
+            end;
+
+            var reqCofins := reqImposto.GetValue<TJSONObject>('COFINS');
+            with COFINS do
             begin
-               vBC       := reqCofinsSt.GetValue<Currency>('vBC');
-               pCOFINS   := reqCofinsSt.GetValue<Currency>('pCOFINS');
-               qBCProd   := reqCofinsSt.GetValue<Currency>('qBCProd');
-               vAliqProd := reqCofinsSt.GetValue<Currency>('vAliqProd');
-               vCOFINS   := reqCofinsSt.GetValue<Currency>('vCOFINS');
-               {
-                 abaixo o campo incluido no layout a partir da NT 2020/005
-               }
-               {
-                 valores aceitos pelo campo:
-                 iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe
-               }
-               // Indica se o valor da COFINS ST compõe o valor total da NF-e
-               indSomaCOFINSST :=  StrToindSomaCOFINSST(Ok,reqCofinsSt.GetValue<String>('indSomaCOFINSST')); // ['', '0', '1'],[iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe]);
-               if not ok then raise Exception.Create('indSomaCONFINSST incorreto!');
+               CST     := StrToCSTCOFINS(ok,reqCofins.GetValue<String>('CST'));  //cof01, cof02, cof03, cof04, cof05, cof06, cof07, cof08, cof09, cof49, cof50, cof51, cof52, cof53,
+               if not ok then raise Exception.Create('CST COFINS incorreto!');   //cof54, cof55, cof56, cof60, cof61, cof62, cof63, cof64, cof65, cof66, cof67, cof70, cof71, cof72, cof73, cof74, cof75, cof98, cof99
+               vBC     := reqCofins.GetValue<Currency>('vBC');
+               pCOFINS := reqCofins.GetValue<Currency>('pCOFINS');
+               vCOFINS := reqCofins.GetValue<Currency>('vCOFINS');
+               //qBCProd   := reqCofins.GetValue<Currency>('qBCProd');
+               //vAliqProd := reqCofins.GetValue<Currency>('vAliqProd');
+            end;
+
+            var reqCofinsSt := reqImposto.GetValue<TJSONObject>('COFINSST',Nil);
+            if reqCofinsSt <> Nil then begin
+               with COFINSST do
+               begin
+                  vBC       := reqCofinsSt.GetValue<Currency>('vBC');
+                  pCOFINS   := reqCofinsSt.GetValue<Currency>('pCOFINS');
+                  qBCProd   := reqCofinsSt.GetValue<Currency>('qBCProd');
+                  vAliqProd := reqCofinsSt.GetValue<Currency>('vAliqProd');
+                  vCOFINS   := reqCofinsSt.GetValue<Currency>('vCOFINS');
+                  {
+                    abaixo o campo incluido no layout a partir da NT 2020/005
+                  }
+                  {
+                    valores aceitos pelo campo:
+                    iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe
+                  }
+                  // Indica se o valor da COFINS ST compõe o valor total da NF-e
+                  indSomaCOFINSST :=  StrToindSomaCOFINSST(Ok,reqCofinsSt.GetValue<String>('indSomaCOFINSST')); // ['', '0', '1'],[iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe]);
+                  if not ok then raise Exception.Create('indSomaCONFINSST incorreto!');
+               end;
             end;
          end;
       end;
@@ -1595,7 +1633,7 @@ begin
 
    var arrDuplicata := req.GetValue<TJSONArray>('cobrancaDuplicata', Nil);
    if arrDuplicata <> Nil then begin
-      for I := 0 to arrDuplicata.Count -1 do begin
+      for var I := 0 to arrDuplicata.Count -1 do begin
          Duplicata := NotaF.NFe.Cobr.Dup.New;
          Duplicata.nDup  := arrDuplicata.Items[i].GetValue<String>('numero');
          Duplicata.dVenc := arrDuplicata.Items[i].GetValue<TDateTime>('vencimento');
@@ -1613,7 +1651,7 @@ begin
 
    var arrReqObsComplementar := reqInfAdicional.GetValue<TJSONArray>('obsComplementar', Nil);
    if arrReqObsComplementar <> Nil then begin
-      for I := 0 to arrReqObsComplementar.Count - 1 do begin
+      for var I := 0 to arrReqObsComplementar.Count - 1 do begin
          ObsComplementar := NotaF.NFe.InfAdic.obsCont.New;
          ObsComplementar.xCampo := arrReqObsComplementar.Items[I].GetValue<String>('campo');
          ObsComplementar.xTexto := arrReqObsComplementar.Items[I].GetValue<String>('texto');
@@ -1622,7 +1660,7 @@ begin
 
    var arrReqObsFisco := reqInfAdicional.GetValue<TJSONArray>('obsFisco', Nil);
    if arrReqObsFisco <> Nil then begin
-      for I := 0 to arrReqObsFisco.Count -1 do begin
+      for var I := 0 to arrReqObsFisco.Count -1 do begin
          ObsFisco := NotaF.NFe.InfAdic.obsFisco.New;
          ObsFisco.xCampo := arrReqObsFisco.Items[I].GetValue<String>('campo');
          ObsFisco.xTexto := arrReqObsFisco.Items[I].GetValue<string>('texto');
@@ -1651,7 +1689,7 @@ begin
 
    // YA. Informações de pagamento
    var reqArrPagamento := req.GetValue<TJSONArray>('pagamento');
-   for I := 0 to reqArrPagamento.Count -1 do begin
+   for var I := 0 to reqArrPagamento.Count -1 do begin
       InfoPgto := NotaF.NFe.pag.New;
       InfoPgto.indPag := StrToIndpag(ok,reqArrPagamento.Items[i].GetValue<String>('condicao',emptyStr)); //StrToEnumerado(ok, s, ['0', '1', '2', ''], [ipVista, ipPrazo, ipOutras, ipNenhum]);
       if not ok then raise Exception.Create('condicao pagamento incorreto!');
@@ -1688,8 +1726,8 @@ begin
          bcGoodCard, bcGreenCard, bcHiper, bcJcB, bcMais, bcMaxVan, bcPolicard, bcRedeCompras, bcSodexo,
          bcValeCard, bcVerocheque, bcVR, bcTicket, bcOutros, TpcnBandeiraCartao(-1)]);}
          if not ok then raise Exception.Create('bandeiraCartao incorreto!');
-         InfoPgto.cAut      := reqArrPagamento.Items[i].GetValue<String>('codAutorizacao');
-      end;
+         InfoPgto.cAut      := reqArrPagamento.Items[i].GetValue<String>('codAutorizacao')
+      end else InfoPgto.tpIntegra := TtpIntegra.tiPagNaoIntegrado;
 
       // YA09 Troco
       // Regra opcional: Informar se valor dos pagamentos maior que valor da nota.

@@ -1,0 +1,1792 @@
+unit uEmiteNfe;
+
+interface
+
+uses
+   ACBRNfe, ACBrNFeNotasFiscais, pcnNFe, pcnConversao, JSON, pcnConversaoNFE,
+   System.SysUtils, System.StrUtils, ACBrDFeUtil, //SHDocVw,
+   ACBrUtil.FilesIO,  ACBrUtil.XMLHTML, //VCL.StdCtrls,
+   ACBrDFeSSL, blcksock,System.Generics.Collections,
+   System.IniFiles, System.Classes, System.TypInfo, ACBrMail, WebModuleUnit1;
+
+type
+   TEmiteNfe = class
+   public
+      constructor Create(profile:string);
+      destructor Destroy; override;
+      function GerarNfe(dataReq:TJSONObject) : string;
+      function GerarNFCe(dataReq:TJSONObject) : string;
+      function EventoCancelamento(req: TJSONObject): string;
+      function StatusServico: string;
+      function ConsultaNF(chave: string) : string;
+      function EventoCartaCorrecao(req: TJSONObject): string;
+      function InutilizaNumeracao(req: TJSONObject): string;
+   private
+    function AlimentarNFe(req:TJSONObject) : string;
+    function AlimentarNFCe(req: TJSONObject) : string;
+    function EnviaNFe : string;
+    procedure LerConfiguracao(pathConfig:string);
+    procedure ConfiguraAmbiente(profile:string);
+    var ACBrNFe : TACBrNFe ;
+    var ACBRMail : TACBrMail;
+    var profilePath : string;
+
+end;
+
+implementation
+
+uses
+   JsonUtils, ServerConst1;
+
+constructor TEmiteNfe.Create(profile:string);
+
+begin
+   inherited Create;
+   ACBrNFe  := TACBrNFe.Create(Nil);
+   ACBrMail := TACBrMail.Create(Nil);
+   ConfiguraAmbiente(profile);
+end;
+
+function TEmiteNfe.GerarNfe(dataReq:TJSONObject) : string;
+begin
+    ACBrNFe.NotasFiscais.Clear;
+    Result := AlimentarNFe(dataReq);
+end;
+
+function TEmiteNfe.GerarNFCe(dataReq:TJSONObject) : string;
+begin
+    ACBrNFe.NotasFiscais.Clear;
+    Result := AlimentarNFCe(dataReq);
+end;
+
+procedure TEmiteNfe.ConfiguraAmbiente(profile:string);
+begin
+   profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + profile + '\';
+   if (not DirectoryExists(profilePath)) or (profile = '') then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
+   LerConfiguracao(profilePath + 'config.ini');
+end;
+
+function TEmiteNfe.StatusServico: string;
+begin
+   ACBrNFe.WebServices.StatusServico.Executar;
+
+   var objResult := TJSONObject.Create;
+   try
+      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.StatusServico.tpAmb));
+      objResult.AddPair('verAplic',ACBrNFe.WebServices.StatusServico.verAplic);
+      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.StatusServico.cStat));
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.StatusServico.xMotivo);
+      objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.StatusServico.cUF));
+      objResult.AddPair('dhRecbto',DateTimeToStr(ACBrNFe.WebServices.StatusServico.dhRecbto));
+      objResult.AddPair('tMed',IntToStr(ACBrNFe.WebServices.StatusServico.TMed));
+      objResult.AddPair('dhRetorno',DateTimeToStr(ACBrNFe.WebServices.StatusServico.dhRetorno));
+      objResult.AddPair('xObs',ACBrNFe.WebServices.StatusServico.xObs);
+      objResult.AddPair('RetWs',ACBrNFe.WebServices.StatusServico.RetWS);
+      objResult.AddPair('RetornoWs',ACBrNFe.WebServices.StatusServico.RetornoWS);
+      Result := objResult.ToString;
+   finally
+      objResult.Free;
+   end;
+end;
+
+function TEmiteNfe.ConsultaNF(chave:string) : string;
+begin
+   ACBrNFe.NotasFiscais.Clear;
+   ACBrNFe.WebServices.Consulta.NFeChave := chave;
+   ACBrNFe.WebServices.Consulta.Executar;
+
+   var objResult := TJSONObject.Create;
+   try
+      objResult.AddPair('cStat',ACBrNFe.WebServices.Consulta.cStat);
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.Consulta.XMotivo);
+      objResult.AddPair('dhRecbto',DateTimeToStr(ACBrNFe.WebServices.Consulta.DhRecbto));
+      objResult.AddPair('chNFe',ACBrNFe.WebServices.Consulta.NFeChave);
+      objResult.AddPair('protNFe',ACBrNFe.WebServices.Consulta.Protocolo);
+      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Consulta.TpAmb));
+      objResult.AddPair('verAplic',ACBrNFe.WebServices.Consulta.verAplic);
+      objResult.AddPair('RetWs',ACBrNFe.WebServices.Consulta.RetWS);
+      objResult.AddPair('RetornoWs',ACBrNFe.WebServices.Consulta.RetornoWS);
+
+      Result := objResult.ToString;
+   finally
+      objResult.Free;
+   end;
+end;
+
+function TEmiteNfe.EventoCartaCorrecao(req: TJSONObject): string;
+var
+  ok: Boolean;
+begin
+   validateAllProperties(req,['chave','idLote','CNPJCPF','nSeqEvento','correcao','ambiente']);
+
+   ACBrNFe.EventoNFe.Evento.Clear;
+
+   with ACBrNFe.EventoNFe.Evento.New do
+   begin
+      infEvento.chNFe := req.GetValue<String>('chave');
+      infEvento.CNPJ   := req.GetValue<String>('CNPJCPF');
+      infEvento.dhEvento := now;
+      infEvento.tpEvento := teCCe;
+      infEvento.nSeqEvento := req.GetValue<Integer>('nSeqEvento');
+      infEvento.detEvento.xCorrecao := req.GetValue<String>('correcao');
+      InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
+      if not ok then raise Exception.Create('Ambiente incorreto!');
+   end;
+
+   ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
+
+   var objResult := TJSONObject.Create;
+   try
+      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.TpAmb));
+      objResult.AddPair('verAplic',ACBrNFe.WebServices.EnvEvento.EventoRetorno.verAplic);
+      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
+      objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
+      objResult.AddPair('dhRegEvento',DateTimeToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento));
+      objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
+      objResult.AddPair('RetWs',ACBrNFe.WebServices.EnvEvento.RetWS);
+      objResult.AddPair('RetornoWs',ACBrNFe.WebServices.EnvEvento.RetornoWS);
+      Result := objResult.ToString;
+   finally
+      objResult.Free;
+   end;
+end;
+
+function TEmiteNfe.EventoCancelamento(req: TJSONObject): string;
+var ok : Boolean;
+begin
+   validateAllProperties(req,['chave','idLote','CNPJCPF','protocolo','justificativa','ambiente']);
+
+   ACBrNFe.EventoNFe.Evento.Clear;
+
+   with ACBrNFe.EventoNFe.Evento.New do
+   begin
+      infEvento.chNFe := req.GetValue<String>('chave');
+      infEvento.CNPJ   := req.GetValue<String>('CNPJCPF');
+      infEvento.dhEvento := now;
+      infEvento.tpEvento := teCancelamento;
+      infEvento.detEvento.xJust := req.GetValue<String>('justificativa');
+      infEvento.detEvento.nProt := req.GetValue<String>('protocolo');
+      InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
+      if not ok then raise Exception.Create('Tipo de ambiente incorreto!');
+   end;
+
+   ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
+
+   var objResult := TJSONObject.Create;
+   try
+     objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.TpAmb));
+     objResult.AddPair('verAplic',ACBrNFe.WebServices.EnvEvento.EventoRetorno.verAplic);
+     objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
+     objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
+     objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
+     objResult.AddPair('dhRegEvento',DateTimeToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento));
+     objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
+     objResult.AddPair('RetWs',ACBrNFe.WebServices.EnvEvento.RetWS);
+     objResult.AddPair('RetornoWs',ACBrNFe.WebServices.EnvEvento.RetornoWS);
+     Result := objResult.ToString;
+   finally
+     objResult.Free;
+   end;
+end;
+
+function TEmiteNfe.InutilizaNumeracao(req:TJSONObject):string;
+var ok : Boolean;
+begin
+   validateAllProperties(req,['ano','modelo','serie','numeroInicial','numeroFinal','justificativa','cnpjEmit','ambiente']);
+
+   ACBrNFe.EventoNFe.Evento.Clear;
+   ACBrNFe.Configuracoes.WebServices.Ambiente := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
+   ACBrNFe.WebServices.Inutiliza(req.GetValue<string>('cnpjEmit'), req.GetValue<string>('justificativa'),
+      req.GetValue<Integer>('ano'), req.GetValue<Integer>('modelo'), req.GetValue<Integer>('serie'),
+      req.GetValue<Integer>('numeroInicial'), req.GetValue<Integer>('numeroFinal'));
+
+   var objResult := TJSONObject.Create;
+   try
+      objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.Inutilizacao.TpAmb));
+      objResult.AddPair('verAplic',ACBrNFe.WebServices.Inutilizacao.verAplic);
+      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.Inutilizacao.cStat));
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.Inutilizacao.xMotivo);
+      objResult.AddPair('cUF',IntToStr(ACBrNFe.WebServices.Inutilizacao.cUF));
+      objResult.AddPair('ano',IntToStr(ACBrNFe.WebServices.Inutilizacao.Ano));
+      objResult.AddPair('CNPJ',ACBrNFe.WebServices.Inutilizacao.CNPJ);
+      objResult.AddPair('modelo',IntToStr(ACBrNFe.WebServices.Inutilizacao.Modelo));
+      objResult.AddPair('serie',IntToStr(ACBrNFe.WebServices.Inutilizacao.Serie));
+      objResult.AddPair('numeroInicial',IntToStr(ACBrNFe.WebServices.Inutilizacao.NumeroInicial));
+      objResult.AddPair('numeroFinal',IntToStr(ACBrNFe.WebServices.Inutilizacao.NumeroFinal));
+      objResult.AddPair('dhRecbto',DateTimeToStr(ACBrNFe.WebServices.Inutilizacao.dhRecbto));
+      objResult.AddPair('protocolo',ACBrNFe.WebServices.Inutilizacao.Protocolo);
+      objResult.AddPair('retWS',ACBrNFe.WebServices.Inutilizacao.RetWS);
+      objResult.AddPair('retornoWS',ACBrNFe.WebServices.Inutilizacao.RetornoWS);
+
+      Result := objResult.ToString;
+   finally
+      objResult.Free;
+   end;
+end;
+
+procedure TEmiteNfe.LerConfiguracao(pathConfig:string);
+var
+  Ini: TIniFile;
+  ok : boolean;
+begin
+
+Ini := TIniFile.Create(pathConfig);
+
+   try
+      ACBrNFe.SSL.SSLType                               :=  TSSLType.LT_TLSv1_2; //TSSLType(Ini.ReadInteger(  'WebService',  'SSLType',  5 ));
+      ACBrNFe.Configuracoes.Certificados.URLPFX         := Ini.ReadString(            'Certificado', 'URL',        '');
+      ACBrNFe.Configuracoes.Certificados.ArquivoPFX     := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + GlobalConfig.profile  + '\' + Ini.ReadString( 'Certificado', 'NomeArqCert', '');
+     // ACBrNFe.Configuracoes.Certificados.NumeroSerie    := Ini.ReadString(            'Certificado', 'NumSerie',   '');
+
+      with ACBrNFe.Configuracoes.Geral do begin
+         SSLLib                := TSSLLib( Ini.ReadInteger(         'Certificado', 'SSLLib',           0));
+         SSLCryptLib           := TSSLCryptLib(Ini.ReadInteger(     'Certificado', 'CryptLib',         0));
+         SSLHttpLib            := TSSLHttpLib(Ini.ReadInteger(      'Certificado', 'HttpLib',          0));
+         SSLXmlSignLib         := TSSLXmlSignLib(Ini.ReadInteger(   'Certificado', 'XmlSignLib',       0));
+         AtualizarXMLCancelado := Ini.ReadBool(                     'Geral',       'AtualizarXML',     True);
+         ExibirErroSchema      := Ini.ReadBool(                     'Geral',       'ExibirErroSchema', True);
+         FormatoAlerta         := Ini.ReadString(                   'Geral',       'FormatoAlerta',    'TAG:%TAGNIVEL% ID:%ID%/%TAG%(%DESCRICAO%) - %MSG%.');
+         FormaEmissao          := TpcnTipoEmissao(Ini.ReadInteger(  'Geral',       'FormaEmissao',     0));
+         ModeloDF              := TpcnModeloDF(Ini.ReadInteger(     'Geral',       'ModeloDF',         0));
+         VersaoDF              := TpcnVersaoDF(Ini.ReadInteger(     'Geral',       'VersaoDF',         0));
+         IdCSC                 := Ini.ReadString(                   'Geral',       'IdToken',          '');
+         Salvar                := Ini.ReadBool(                     'Geral',       'Salvar',           True);
+         RetirarAcentos        := Ini.ReadBool(                     'Geral',       'RetirarAcentos',   True);
+         VersaoQRCode          := veqr200;
+      end;
+
+      with ACBrNFe.Configuracoes.WebServices do begin
+
+         Ambiente                 := StrToTpAmb(ok, Ini.Readstring(  'WebService', 'Ambiente',   '2'));  //['1', '2'], [taProducao, taHomologacao]);
+         if not ok then raise Exception.Create('Falha ao ler o ambiente');
+         Visualizar               := Ini.ReadBool(                   'WebService', 'Visualizar', False);
+         Salvar                   := Ini.ReadBool(                   'WebService', 'SalvarSOAP', False);
+         AjustaAguardaConsultaRet := Ini.ReadBool(                   'WebService', 'AjustarAut', False);
+         AguardarConsultaRet      := iif(Ini.ReadInteger(            'WebService', 'Aguardar',   0) < 1000, Ini.ReadInteger( 'WebService', 'Aguardar',  0) * 1000 ,Ini.ReadInteger( 'WebService', 'Aguardar',   0));
+         Tentativas               := Ini.ReadInteger(                'WebService', 'Tentativas', 5);
+         IntervaloTentativas      := iif(Ini.ReadInteger(            'WebService', 'Intervalo',  0) < 1000, Ini.ReadInteger( 'WebService', 'Intervalo',  0) * 1000, Ini.ReadInteger( 'WebService', 'Intervalo',  0));
+         TimeOut                  := Ini.ReadInteger(                'WebService', 'TimeOut',    5000);
+         ProxyHost                := Ini.ReadString(                 'Proxy',      'Host',       '');
+         ProxyPort                := Ini.ReadString(                 'Proxy',      'Porta',      '');
+         ProxyUser                := Ini.ReadString(                 'Proxy',      'User',       '');
+         ProxyPass                := Ini.ReadString(                 'Proxy',      'Pass',       '');
+      end;
+
+      with ACBrNFe.Configuracoes.Arquivos do begin
+         PathSchemas      := Ini.ReadString(  'Arquivos', 'PathSchemas',      PathWithDelim(ExtractFilePath(ParamStr(0)))+'Schemas\'+GetEnumName(TypeInfo(TpcnVersaoDF), integer(ACBrNFe.Configuracoes.Geral.VersaoDF) ));
+         PathSalvar       := Ini.ReadString(  'Arquivos', 'PathSalvar',       PathWithDelim(ExtractFilePath(ParamStr(0)))+'Logs');
+         Salvar           := Ini.ReadBool(    'Arquivos', 'Salvar',           false);
+         SepararPorMes    := Ini.ReadBool(    'Arquivos', 'PastaMensal',      false);
+         AdicionarLiteral := Ini.ReadBool(    'Arquivos', 'AddLiteral',       false);
+         EmissaoPathNFe   := Ini.ReadBool(    'Arquivos', 'EmissaoPathNFe',   false);
+         SalvarEvento     := Ini.ReadBool(    'Arquivos', 'SalvarPathEvento', false);
+         SepararPorCNPJ   := Ini.ReadBool(    'Arquivos', 'SepararPorCNPJ',   false);
+         SepararPorModelo := Ini.ReadBool(    'Arquivos', 'SepararPorModelo', false);
+         PathNFe          := Ini.ReadString(  'Arquivos', 'PathNFe',          '');
+         PathInu          := Ini.ReadString(  'Arquivos', 'PathInu',          '');
+         PathEvento       := Ini.ReadString(  'Arquivos', 'PathEvento',       '');
+      end;
+
+      ACBrMail.Host                := Ini.ReadString(  'Email', 'Host',    '');
+      ACBrMail.Port                := Ini.ReadString(  'Email', 'Port',    '');
+      ACBrMail.Username            := Ini.ReadString(  'Email', 'User',    '');
+      ACBrMail.Password            := Ini.ReadString(  'Email', 'Pass',    '');
+      ACBrMail.From                := ACBrMail.Username;
+      ACBrMail.ReadingConfirmation := False; // Pede confirmacao de leitura do email
+      ACBrMail.UseThread           := False; // Aguarda Envio do Email(nao usa thread)
+      ACBrMail.Subject             := Ini.ReadString('Email', 'Assunto', '');
+      ACBrMail.SetSSL              := Ini.ReadBool(  'Email', 'SSL',     False);
+      ACBrMail.SetTLS              := Ini.ReadBool(  'Email', 'SSL',     False);
+      ACBrMail.FromName            := 'Safyra - Gestão do seu negocio';
+
+      ACBrNFe.SSL.DescarregarCertificado;
+
+   finally
+      Ini.Free;
+   end;
+end;
+
+function TEmiteNfe.AlimentarNFCe(req: TJSONObject): string;
+var
+  Ok: Boolean;
+  BaseCalculo,
+  ValorICMS: Double;
+  reqEmit, reqEmitEnde, reqDest, reqDestEnde, reqEntrega : TJSONObject;
+  arrProdutos : TJSONArray;
+begin
+   ACBrNFe.Configuracoes.Certificados.Senha  := AnsiString(req.GetValue<string>('certificadoSenha'));
+   ACBRNfe.Configuracoes.Geral.CSC           := req.GetValue<String>('codCSC') ; // Token para emissao do QRCODE nfce, usuario precisa passar
+   ACBRNfe.Configuracoes.WebServices.UF      := req.GetValue<String>('cUF');
+
+   with ACBrNFe.NotasFiscais.Add.NFe do begin
+   Ide.natOp       := req.GetValue<string>('natOp');
+   Ide.nNF         := req.GetValue<Integer>('nNF');
+   Ide.indPag      := StrToIndpag(ok, req.GetValue<String>('indPag'));
+   if not ok then raise Exception.Create('indPag incorreto !');
+   Ide.tpNF        := StrToTpNF(ok, req.GetValue<String>('tpNF'));
+   if not ok then raise Exception.Create('tpNF incorreto !');
+   Ide.tpEmis      := StrToTpEmis(ok, req.GetValue<String>('tpEmis'));
+   if not ok then raise Exception.Create('tpEmis incorreto !');
+   Ide.tpAmb       := StrToTpAmb(ok, req.GetValue<String>('ambiente'));
+   if not ok then raise Exception.Create('ambiente incorreto !');
+   Ide.indFinal    := StrToConsumidorFinal(ok,req.GetValue<String>('indFinal'));
+   if not ok then raise Exception.Create('indFinal incorreto !');
+   Ide.cUF         := UFtoCUF(req.GetValue<String>('cUF'));
+   Ide.cMunFG      := req.GetValue<Integer>('cMunFG');
+   Ide.finNFe      := StrToFinNFe(ok,req.GetValue<String>('finalidadeNFe'));
+   if not ok then raise Exception.Create('finalidadeNFe incorreto !');
+//   Ide.indIntermed := StrToIndIntermed(Ok,req.GetValue<String>('indIntermediador'));  //['', '0', '1'],  [iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador]);
+//   if not ok then raise Exception.Create('indIntermediador incorreto !');
+
+   Ide.modelo    := 65;
+   Ide.serie     := req.GetValue<Integer>('serie');
+   Ide.cNF       := GerarCodigoDFe(Ide.nNF);
+   Ide.dEmi      := now;
+   Ide.dSaiEnt   := now;
+   Ide.hSaiEnt   := now;
+   Ide.tpImp     := tiNFCe;
+
+   {
+   valores aceitos pelo campo:
+   pcNao, pcPresencial, pcInternet, pcTeleatendimento, pcEntregaDomicilio,
+   pcPresencialForaEstabelecimento, pcOutros
+   }
+   Ide.indPres   := StrToPresencaComprador(ok,req.GetValue<String>('indPresenca'));
+   if not ok then raise Exception.Create('indPresenca incorreto !');
+   {
+   abaixo o campo incluido no layout a partir da NT 2020/006
+   }
+   {
+   valores aceitos pelo campo:
+   iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador
+   }
+   // Indicador de intermediador/marketplace
+
+   //     Ide.dhCont := date;
+   //     Ide.xJust  := 'Justificativa Contingencia';
+   reqEmit := req.GetValue<TJSONObject>('emitente');
+   Emit.CNPJCPF           := reqEmit.GetValue<String>('CNPJCPF');
+   if Emit.CNPJCPF <> GlobalConfig.cnpj then raise Exception.Create('Emitente não confere com o autorizado!');
+   Emit.IE                := reqEmit.GetValue<String>('IE');
+   Emit.xNome             := reqEmit.GetValue<String>('razaoSocial');
+   Emit.xFant             := reqEmit.GetValue<String>('nomeFantasia');
+
+   reqEmitEnde :=  reqEmit.GetValue<TJSONObject>('endereco');
+   Emit.EnderEmit.fone    := reqEmitEnde.GetValue<String>('fone');
+   Emit.EnderEmit.CEP     := reqEmitEnde.GetValue<Integer>('CEP');
+   Emit.EnderEmit.xLgr    := reqEmitEnde.GetValue<String>('logradouro');
+   Emit.EnderEmit.nro     := reqEmitEnde.GetValue<String>('numero');
+   Emit.EnderEmit.xCpl    := reqEmitEnde.GetValue<String>('complemento');
+   Emit.EnderEmit.xBairro := reqEmitEnde.GetValue<String>('bairro');
+   Emit.EnderEmit.cMun    := reqEmitEnde.GetValue<Integer>('codMunicipio');
+   Emit.EnderEmit.xMun    := reqEmitEnde.GetValue<String>('nomeMunicipio');
+   Emit.EnderEmit.UF      := reqEmitEnde.GetValue<String>('UF');
+   Emit.enderEmit.cPais   := 1058;
+   Emit.enderEmit.xPais   := 'BRASIL';
+
+   Emit.IEST := '';
+   // esta sendo somando 1 uma vez que o ItemIndex inicia do zero e devemos
+   // passar os valores 1, 2 ou 3
+   // (1-crtSimplesNacional, 2-crtSimplesExcessoReceita, 3-crtRegimeNormal)
+   Emit.CRT  :=  StrToCRT(Ok, IntToStr(reqEmit.GetValue<Integer>('CRT')));
+
+   // Na NFC-e o Destinatário é opcional
+   reqDest                := req.GetValue<TJSONObject>('destinatario',Nil);
+   if reqDest <> Nil then begin
+
+    Dest.CNPJCPF           := reqDest.GetValue<String>('CNPJCPF');
+    Dest.ISUF              := reqDest.GetValue<String>('ISUF');
+    Dest.xNome             := reqDest.GetValue<String>('nome');
+    Dest.indIEDest         := StrToindIEDest(ok,reqDest.GetValue<String>('indIEDest')); //['1', '2', '9'], [inContribuinte, inIsento, inNaoContribuinte]);
+    if not ok then raise Exception.Create('indIEDest incorreto.');
+    if Dest.indIEDest = inContribuinte then
+    Dest.IE                := reqDest.GetValue<String>('IE');
+
+    reqDestEnde            := reqDest.GetValue<TJSONObject>('endereco');
+    Dest.EnderDest.Fone    := reqDestEnde.GetValue<String>('fone');
+    Dest.EnderDest.CEP     := reqDestEnde.GetValue<Integer>('CEP');
+    Dest.EnderDest.xLgr    := reqDestEnde.GetValue<String>('logradouro');
+    Dest.EnderDest.nro     := reqDestEnde.GetValue<String>('numero');
+    Dest.EnderDest.xCpl    := reqDestEnde.GetValue<String>('complemento');
+    Dest.EnderDest.xBairro := reqDestEnde.GetValue<String>('bairro');
+    Dest.EnderDest.cMun    := reqDestEnde.GetValue<Integer>('codMunicipio');
+    Dest.EnderDest.xMun    := reqDestEnde.GetValue<String>('nomeMunicipio');
+    Dest.EnderDest.UF      := reqDestEnde.GetValue<String>('UF');
+    Dest.EnderDest.cPais   := 1058;
+    Dest.EnderDest.xPais   := 'BRASIL';
+   end;
+
+
+
+     reqEntrega := req.GetValue<TJSONObject>('entrega', Nil);
+     if reqEntrega <> Nil then begin
+         case AnsiIndexStr(UpperCase(reqEntrega.GetValue<string>('tipo')),['RETIRADA','ENTREGA']) of
+
+            0: begin //Use os campos abaixo para informar o endereço de retirada quando for diferente do Remetente/Destinatário
+               Retirada.CNPJCPF := reqEntrega.GetValue<String>('CNPJCPF');
+               Retirada.xLgr    := reqEntrega.GetValue<String>('logradouro');
+               Retirada.nro     := reqEntrega.GetValue<String>('numero');
+               Retirada.xCpl    := reqEntrega.GetValue<String>('complemento');
+               Retirada.xBairro := reqEntrega.GetValue<String>('bairro');
+               Retirada.Cep     := reqEntrega.GetValue<Integer>('CEP');
+               Retirada.cMun    := reqEntrega.GetValue<Integer>('codMunicipio');
+               Retirada.xMun    := reqEntrega.GetValue<String>('nomeMunicipio');
+               Retirada.UF      := reqEntrega.GetValue<String>('UF');
+            end;
+
+            1 : begin //Use os campos abaixo para informar o endereço de entrega quando for diferente do Remetente/Destinatário
+               Entrega.CNPJCPF := reqEntrega.GetValue<String>('CNPJCPF');
+               Entrega.xLgr    := reqEntrega.GetValue<String>('logradouro');
+               Entrega.nro     := reqEntrega.GetValue<String>('numero');
+               Entrega.xCpl    := reqEntrega.GetValue<String>('complemento');
+               Entrega.xBairro := reqEntrega.GetValue<String>('bairro');
+               Entrega.Cep     := reqEntrega.GetValue<Integer>('CEP');
+               Entrega.cMun    := reqEntrega.GetValue<Integer>('codMunicipio');
+               Entrega.xMun    := reqEntrega.GetValue<String>('nomeMunicipio');
+               Entrega.UF      := reqEntrega.GetValue<String>('UF');
+            end;
+         end;
+
+     end;
+
+   arrProdutos := req.GetValue<TJSONArray>('produtos');
+
+   for var I := 0 to arrProdutos.Count -1 do begin
+      //Adicionando Produtos
+       with Det.New do
+       begin
+         Prod.nItem    := I + 1; // Número sequencial, para cada item deve ser incrementado
+         Prod.cProd    := arrProdutos.Items[i].GetValue<String>('codigo');
+         Prod.cEAN     := arrProdutos.Items[i].GetValue<String>('EAN');
+         Prod.xProd    := arrProdutos.Items[i].GetValue<String>('descricao');
+         Prod.NCM      := arrProdutos.Items[i].GetValue<String>('NCM'); // Tabela NCM disponível em  http://www.receita.fazenda.gov.br/Aliquotas/DownloadArqTIPI.htm
+         Prod.EXTIPI   := arrProdutos.Items[i].GetValue<String>('extIPI');
+         Prod.CFOP     := arrProdutos.Items[i].GetValue<String>('CFOP');
+         Prod.uCom     := arrProdutos.Items[i].GetValue<String>('unidade');
+         Prod.qCom     := arrProdutos.Items[i].GetValue<Integer>('quantidade');
+         Prod.vUnCom   := arrProdutos.Items[i].GetValue<Double>('valorUnitarioComerc');
+         Prod.vProd    := arrProdutos.Items[i].GetValue<Currency>('valorTotalProdutos');
+
+         Prod.cEANTrib  := arrProdutos.Items[i].GetValue<String>('EANTrib');
+         Prod.uTrib     := arrProdutos.Items[i].GetValue<String>('unidadeTrib');
+         Prod.qTrib     := arrProdutos.Items[i].GetValue<Integer>('quantidadeTrib');
+         Prod.vUnTrib   := arrProdutos.Items[i].GetValue<Double>('valorUnitarioTrib');
+
+         Prod.vOutro    := arrProdutos.Items[i].GetValue<Currency>('valorOutro');
+         Prod.vFrete    := arrProdutos.Items[i].GetValue<Currency>('valorFrete');
+         Prod.vSeg      := arrProdutos.Items[i].GetValue<Currency>('valorSeguro');
+         Prod.vDesc     := arrProdutos.Items[i].GetValue<Currency>('valorDesconto');
+
+         Prod.CEST      := arrProdutos.Items[i].GetValue<String>('CEST','');
+         infAdProd      := arrProdutos.Items[i].GetValue<String>('infAdProd');
+
+         {
+           abaixo os campos incluidos no layout a partir da NT 2020/005
+         }
+         // Opcional - Preencher com o Código de Barras próprio ou de terceiros que seja diferente do padrão GTIN
+         // por exemplo: código de barras de catálogo, partnumber, etc
+         Prod.cBarra := arrProdutos.Items[i].GetValue<String>('codBarra');
+         // Opcional - Preencher com o Código de Barras próprio ou de terceiros que seja diferente do padrão GTIN
+         //  correspondente àquele da menor unidade comercializável identificado por Código de Barras
+         // por exemplo: código de barras de catálogo, partnumber, etc
+         Prod.cBarraTrib := arrProdutos.Items[i].GetValue<String>('codBarraTrib');
+
+
+         // Declaração de Importação. Pode ser adicionada várias através do comando Prod.DI.New
+         (*
+         with Prod.DI.New do
+         begin
+           nDi         := '';
+           dDi         := now;
+           xLocDesemb  := '';
+           UFDesemb    := '';
+           dDesemb     := now;
+           {
+             tvMaritima, tvFluvial, tvLacustre, tvAerea, tvPostal, tvFerroviaria, tvRodoviaria,
+
+             abaixo os novos valores incluidos a partir da NT 2020/005
+
+             tvConduto, tvMeiosProprios, tvEntradaSaidaFicta, tvCourier, tvEmMaos, tvPorReboque
+           }
+           tpViaTransp := tvRodoviaria;
+           vAFRMM := 0;
+           {
+             tiContaPropria, tiContaOrdem, tiEncomenda
+           }
+           tpIntermedio := tiContaPropria;
+           CNPJ := '';
+           UFTerceiro := '';
+           cExportador := '';
+
+           with adi.New do
+           begin
+             nAdicao     := 1;
+             nSeqAdi     := 1;
+             cFabricante := '';
+             vDescDI     := 0;
+             nDraw       := '';
+           end;
+         end;
+         *)
+
+         with Imposto do
+         begin
+           var reqImposto := arrProdutos.Items[i].GetValue<TJSONObject>('imposto');
+           // lei da transparencia nos impostos
+           vTotTrib := reqImposto.GetValue<Currency>('vTotTrib');
+
+           var reqICMS := reqImposto.GetValue<TJSONObject>('ICMS', Nil);
+
+           if reqICMS <> Nil then begin
+
+              with ICMS do
+              begin
+                // caso o CRT seja:
+                // 1=Simples Nacional
+                // Os valores aceitos para CSOSN são:
+                // csosn101, csosn102, csosn103, csosn201, csosn202, csosn203,
+                // csosn300, csosn400, csosn500,csosn900
+
+                // 2=Simples Nacional, excesso sublimite de receita bruta;
+                // ou 3=Regime Normal.
+                // Os valores aceitos para CST são:
+                // cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
+                // cst60, cst70, cst80, cst81, cst90, cstPart10, cstPart90,
+                // cstRep41, cstVazio, cstICMSOutraUF, cstICMSSN, cstRep60
+
+                // (consulte o contador do seu cliente para saber qual deve ser utilizado)
+                // Pode variar de um produto para outro.
+
+                orig    := StrToOrig(ok,reqImposto.GetValue<String>('origemMercadoria')) ;
+                if not ok then raise Exception.Create('origemMercadoria Incorreto!');
+
+
+                if Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then begin
+                  CST := StrToCSTICMS(ok,reqICMS.GetValue<string>('CST'));
+                  if not ok then raise Exception.Create('CST incorreto!')
+                end else
+                  CSOSN := StrToCSOSNIcms(ok,reqICMS.GetValue<string>('CSOSN'));
+                  if not ok then raise Exception.Create('CSOSN incorreto');
+
+                var modBCStr := reqICMS.GetValue<String>('modBC',emptyStr);
+                if (modBCStr <> emptyStr) then begin
+                   modBC   := StrTomodBC(Ok,modBCStr);
+                   if not ok then raise Exception.Create('modBC incorreto!');
+                end;
+
+                vBC     := reqICMS.GetValue<Currency>('vBC');
+                pICMS   := reqICMS.GetValue<Currency>('pICMS');
+
+                ValorICMS := reqICMS.GetValue<Currency>('vICMS');
+
+                vICMS   := ValorICMS;
+                modBCST := dbisMargemValorAgregado;
+                pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
+                pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
+                vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
+                pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
+                vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
+                pRedBC  := reqICMS.GetValue<Currency>('pRedBC',0);
+                pCredSN := reqICMS.GetValue<Currency>('pCredSN',0);
+
+                vCredICMSSN     := reqICMS.GetValue<Currency>('vCredICMSSN',0);;
+                vBCFCPST        := reqICMS.GetValue<Currency>('vBCFCPST',0);
+                pFCPST          := reqICMS.GetValue<Currency>('pFCPST',0);
+                vFCPST          := reqICMS.GetValue<Currency>('vFCPST',0);
+                vBCSTRet        := reqICMS.GetValue<Currency>('vBCSTRet',0);
+                pST             := reqICMS.GetValue<Currency>('pST',0);
+                vICMSSubstituto := reqICMS.GetValue<Currency>('vICMSSubstituto',0);
+                vICMSSTRet      := reqICMS.GetValue<Currency>('vICMSSTRet',0);
+
+                vBCFCPSTRet := reqICMS.GetValue<Currency>('vBCFCPSTRet',0);
+                pFCPSTRet   := reqICMS.GetValue<Currency>('pFCPSTRet',0);
+                vFCPSTRet   := reqICMS.GetValue<Currency>('vFCPSTRet',0);
+                pRedBCEfet  :=  reqICMS.GetValue<Currency>('pRedBCEfet',0);
+                vBCEfet     :=  reqICMS.GetValue<Currency>('vBCEfet',0);
+                pICMSEfet   := reqICMS.GetValue<Currency>('pICMSEfet',0);
+                vICMSEfet   := reqICMS.GetValue<Currency>('vICMSEfet',0);
+
+                {
+                  abaixo os campos incluidos no layout a partir da NT 2020/005
+                }
+                // Informar apenas nos motivos de desoneração documentados abaixo
+                vICMSSTDeson := reqICMS.GetValue<Currency>('vICMSSTDeson');
+                {
+                  o campo abaixo só aceita os valores:
+                  mdiProdutorAgropecuario, mdiOutros, mdiOrgaoFomento
+                  Campo será preenchido quando o campo anterior estiver preenchido.
+                }
+                //motDesICMSST := mdiOutros;
+
+                // Percentual do diferimento do ICMS relativo ao Fundo de Combate à Pobreza (FCP).
+                // No caso de diferimento total, informar o percentual de diferimento "100"
+                pFCPDif := reqICMS.GetValue<Currency>('pFCPDif',0);
+                // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) diferido
+                vFCPDif := reqICMS.GetValue<Currency>('vFCPDif',0);
+                // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) realmente devido.
+                vFCPEfet := reqICMS.GetValue<Currency>('vFCPEfet',0);
+
+                // partilha do ICMS e fundo de probreza
+                var reqICMSUFDest := reqImposto.GetValue<TJSONObject>('ICMSUFDest');
+                with ICMSUFDest do
+                begin
+                   vBCUFDest      := reqICMSUFDest.GetValue<Currency>('vBCUFDest');
+                   pFCPUFDest     := reqICMSUFDest.GetValue<Currency>('pFCPUFDest');
+                   pICMSUFDest    := reqICMSUFDest.GetValue<Currency>('pICMSUFDest');
+                   pICMSInter     := reqICMSUFDest.GetValue<Currency>('pICMSInter');
+                   pICMSInterPart := reqICMSUFDest.GetValue<Currency>('pICMSInterPart');
+                   vFCPUFDest     := reqICMSUFDest.GetValue<Currency>('vFCPUFDest');
+                   vICMSUFDest    := reqICMSUFDest.GetValue<Currency>('vICMSUFDest');
+                   vICMSUFRemet   := reqICMSUFDest.GetValue<Currency>('vICMSUFRemet');
+                end;
+              end;
+
+              var reqPis := reqImposto.GetValue<TJSONObject>('PIS', Nil);
+              if reqPis <> Nil then begin
+
+                 with PIS do
+                 begin
+                  CST  := StrToCSTPIS(ok,reqPis.GetValue<String>('CST'));
+                  if not ok then raise Exception.Create('CST PIS incorreto!');
+                  vBC  := reqPis.GetValue<Currency>('vBC');
+                  pPIS := reqPis.GetValue<Currency>('pPIS');
+                  vPIS := reqPis.GetValue<Currency>('vPIS');
+
+                  //qBCProd   := reqPis.GetValue<Currency>('qBCProd');
+                  //vAliqProd := reqPis.GetValue<Currency>('vAliqProd');
+                  vPIS      := reqPis.GetValue<Currency>('vPIS');
+                 end;
+              end;
+
+              var reqPisSt := reqImposto.GetValue<TJSONObject>('PISST', Nil);
+              if reqPisSt <> Nil then begin
+                 with PISST do
+                 begin
+                   vBc       := reqPisSt.GetValue<Currency>('vBc');
+                   pPis      := reqPisSt.GetValue<Currency>('pPis');
+                   qBCProd   := reqPisSt.GetValue<Currency>('qBCProd');
+                   vAliqProd := reqPisSt.GetValue<Currency>('vAliqProd');
+                   vPIS      := reqPisSt.GetValue<Currency>('vPIS');
+                   {
+                     abaixo o campo incluido no layout a partir da NT 2020/005
+                   }
+                   {
+                     valores aceitos pelo campo:
+                     ispNenhum, ispPISSTNaoCompoe, ispPISSTCompoe
+                   }
+                   // Indica se o valor do PISST compõe o valor total da NF-e
+                   IndSomaPISST := StrToindSomaPISST(ok,reqPisSt.GetValue<String>('indSomaPISST'));
+                   if not ok then raise Exception.Create('IndSomaPISST incorreto');
+                 end;
+              end;
+
+              var reqCofins := reqImposto.GetValue<TJSONObject>('COFINS',Nil);
+              if reqCofins <> Nil then begin
+
+                 with COFINS do
+                 begin
+                   CST       := StrToCSTCOFINS(ok,reqCofins.GetValue<String>('CST'));  //cof01, cof02, cof03, cof04, cof05, cof06, cof07, cof08, cof09, cof49, cof50, cof51, cof52, cof53,
+                   if not ok then raise Exception.Create('CST COFINS incorreto!');   //cof54, cof55, cof56, cof60, cof61, cof62, cof63, cof64, cof65, cof66, cof67, cof70, cof71, cof72, cof73, cof74, cof75, cof98, cof99
+                   vBC       := reqCofins.GetValue<Currency>('vBC');
+                   pCOFINS   := reqCofins.GetValue<Currency>('pCOFINS');
+                   vCOFINS   := reqCofins.GetValue<Currency>('vCOFINS');
+                   //qBCProd   := reqCofins.GetValue<Currency>('qBCProd');
+                   //vAliqProd := reqCofins.GetValue<Currency>('vAliqProd');
+                 end;
+              end;
+
+              var reqCofinsSt := reqImposto.GetValue<TJSONObject>('COFINSST',Nil);
+              if reqCofinsSt <> Nil then begin
+                 with COFINSST do
+                 begin
+                   vBC       := reqCofinsSt.GetValue<Currency>('vBC');
+                   pCOFINS   := reqCofinsSt.GetValue<Currency>('pCOFINS');
+                   qBCProd   := reqCofinsSt.GetValue<Currency>('qBCProd');
+                   vAliqProd := reqCofinsSt.GetValue<Currency>('vAliqProd');
+                   vCOFINS   := reqCofinsSt.GetValue<Currency>('vCOFINS');
+                   {
+                     abaixo o campo incluido no layout a partir da NT 2020/005
+                   }
+                   {
+                     valores aceitos pelo campo:
+                     iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe
+                   }
+                   // Indica se o valor da COFINS ST compõe o valor total da NF-e
+                   indSomaCOFINSST :=  StrToindSomaCOFINSST(Ok,reqCofinsSt.GetValue<String>('indSomaCOFINSST')); // ['', '0', '1'],[iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe]);
+                   if not ok then raise Exception.Create('indSomaCONFINSST incorreto!');
+                 end;
+              end;
+           end;
+         end;
+       end;
+   end;
+    var reqTotal := req.GetValue<TJSONObject>('total');
+    var reqTotalICMS := reqTotal.GetValue<TJSONObject>('ICMS');
+    Total.ICMSTot.vBC      := reqTotalICMS.GetValue<Currency>('vBC');
+    Total.ICMSTot.vICMS    := reqTotalICMS.GetValue<Currency>('vICMS');
+    Total.ICMSTot.vBCST    := reqTotalICMS.GetValue<Currency>('vBCST');
+    Total.ICMSTot.vST      := reqTotalICMS.GetValue<Currency>('vST');
+    Total.ICMSTot.vProd    := reqTotalICMS.GetValue<Currency>('vProd');
+    Total.ICMSTot.vFrete   := reqTotalICMS.GetValue<Currency>('vFrete');
+    Total.ICMSTot.vSeg     := reqTotalICMS.GetValue<Currency>('vSeg');
+    Total.ICMSTot.vDesc    := reqTotalICMS.GetValue<Currency>('vDesc');
+    Total.ICMSTot.vII      := reqTotalICMS.GetValue<Currency>('vII');
+    Total.ICMSTot.vIPI     := reqTotalICMS.GetValue<Currency>('vIPI');
+    Total.ICMSTot.vPIS     := reqTotalICMS.GetValue<Currency>('vPIS');
+    Total.ICMSTot.vCOFINS  := reqTotalICMS.GetValue<Currency>('vCOFINS');
+    Total.ICMSTot.vOutro   := reqTotalICMS.GetValue<Currency>('vOutro');
+    Total.ICMSTot.vNF      := reqTotalICMS.GetValue<Currency>('vNF');
+    Total.ICMSTot.vTotTrib := reqTotalICMS.GetValue<Currency>('vTotTrib');
+
+    // partilha do icms e fundo de probreza
+    Total.ICMSTot.vFCPUFDest   := reqTotalICMS.GetValue<Currency>('vFCPUFDest');
+    Total.ICMSTot.vICMSUFDest  := reqTotalICMS.GetValue<Currency>('vICMSUFDest');
+    Total.ICMSTot.vICMSUFRemet := reqTotalICMS.GetValue<Currency>('vICMSUFRemet');
+
+//    Total.ISSQNtot.vServ   := 0;
+//    Total.ISSQNTot.vBC     := 0;
+//    Total.ISSQNTot.vISS    := 0;
+//    Total.ISSQNTot.vPIS    := 0;
+//    Total.ISSQNTot.vCOFINS := 0;
+
+     var reqTotalRetTrib := reqTotal.GetValue<TJSONOBJect>('retTrib', Nil);
+
+     if reqTotalRetTrib <> Nil then begin
+        Total.retTrib.vRetPIS    := reqTotalRetTrib.GetValue<Currency>('vRetPIS');
+        Total.retTrib.vRetCOFINS := reqTotalRetTrib.GetValue<Currency>('vRetCOFINS');
+        Total.retTrib.vRetCSLL   := reqTotalRetTrib.GetValue<Currency>('vRetCSLL');
+        Total.retTrib.vBCIRRF    := reqTotalRetTrib.GetValue<Currency>('vBCIRRF');
+        Total.retTrib.vIRRF      := reqTotalRetTrib.GetValue<Currency>('vIRRF');
+        Total.retTrib.vBCRetPrev := reqTotalRetTrib.GetValue<Currency>('vBCRetPrev');
+        Total.retTrib.vRetPrev   := reqTotalRetTrib.GetValue<Currency>('vRetPrev');
+     end;
+
+    Transp.modFrete := mfSemFrete; // NFC-e não pode ter FRETE
+
+    var reqArrPagamento := req.GetValue<TJSONArray>('pagamento');
+    for var I := 0 to reqArrPagamento.Count -1 do begin
+      with pag.New do
+      begin
+        indPag := StrToIndpag(ok,reqArrPagamento.Items[i].GetValue<String>('condicao',emptyStr)); //StrToEnumerado(ok, s, ['0', '1', '2', ''], [ipVista, ipPrazo, ipOutras, ipNenhum]);
+           if not ok then raise Exception.Create('condicao pagamento incorreto!');
+
+        tPag   := StrToFormaPagamento(Ok,reqArrPagamento.Items[i].GetValue<String>('forma'));
+          if not ok then raise Exception.Create('forma pagamento incorreto!');
+        {
+          abaixo o campo incluido no layout a partir da NT 2020/006
+        }
+        {
+          se tPag for fpOutro devemos incluir o campo xPag
+        xPag := 'Caderneta';
+        }
+          vPag   := reqArrPagamento.Items[i].GetValue<Currency>('valor');
+      end;
+    end;
+
+
+    // O grupo infIntermed só deve ser gerado nos casos de operação não presencial
+    // pela internet em site de terceiros (Intermediadores).
+    //    infIntermed.CNPJ := '';
+    //    infIntermed.idCadIntTran := '';
+    var reqInfAdicional := req.GetValue<TJSONObject>('infAdicional');
+    InfAdic.infCpl     :=  reqInfAdicional.GetValue<String>('infComplementar');
+    InfAdic.infAdFisco :=  reqInfAdicional.GetValue<String>('infAdicionalFisco');
+
+    var arrReqObsComplementar := reqInfAdicional.GetValue<TJSONArray>('obsComplementar', Nil);
+    if arrReqObsComplementar <> Nil then begin
+       for var i := 0 to arrReqObsComplementar.Count -1 do begin
+          with InfAdic.obsCont.New do
+          begin
+            xCampo := arrReqObsComplementar.Items[I].GetValue<String>('campo');
+            xTexto := arrReqObsComplementar.Items[I].GetValue<String>('texto');
+          end;
+       end;
+    end;
+
+    var arrReqObsFisco := reqInfAdicional.GetValue<TJSONArray>('obsFisco', Nil);
+    if arrReqObsFisco <> Nil then begin
+       for var i := 0 to arrReqObsFisco.Count -1 do begin
+          with InfAdic.obsFisco.New do
+          begin
+             xCampo := arrReqObsFisco.Items[I].GetValue<String>('campo');
+             xTexto := arrReqObsFisco.Items[I].GetValue<string>('texto');
+          end;
+       end;
+    end;
+
+    var reqInfIntermed := req.GetValue<TJSONObject>('infIntermediador',Nil);
+    if reqInfIntermed <> Nil then begin
+       infIntermed.CNPJ := reqInfIntermed.GetValue<String>('CNPJ');
+       infIntermed.idCadIntTran := reqInfIntermed.GetValue<String>('idCadIntTran');
+       {
+         abaixo o campo incluido no layout a partir da NT 2020/006
+       }
+       // CNPJ do Intermediador da Transação (agenciador, plataforma de delivery,
+       // marketplace e similar) de serviços e de negócios.
+
+       // Nome do usuário ou identificação do perfil do vendedor no site do intermediador
+       // (agenciador, plataforma de delivery, marketplace e similar) de serviços e de
+       // negócios.
+    end;
+  end;
+  ACBrNFe.NotasFiscais.GerarNFe;
+  result := EnviaNfe;
+end;
+
+function TEmiteNfe.AlimentarNFe(req:TJSONObject) : string;
+var
+   Ok: Boolean;
+   NotaF: NotaFiscal;
+   Produto: TDetCollectionItem;
+   //Servico: TDetCollectionItem;
+   Volume: TVolCollectionItem;
+   Duplicata: TDupCollectionItem;
+   ObsComplementar: TobsContCollectionItem;
+   ObsFisco: TobsFiscoCollectionItem;
+   //Referenciada: TNFrefCollectionItem;
+   //DI: TDICollectionItem;
+   //Adicao: TAdiCollectionItem;
+   //Rastro: TrastroCollectionItem;
+   //Medicamento: TMedCollectionItem;
+   //Arma: TArmaCollectionItem;
+   //Reboque: TreboqueCollectionItem;
+   //Lacre: TLacresCollectionItem;
+   //ProcReferenciado: TprocRefCollectionItem;
+   InfoPgto: TpagCollectionItem;
+   reqEmit, reqEmitEnde, reqDest, reqDestEnde, reqEntrega : TJSONObject;
+   arrProdutos : TJSONArray;
+begin
+   ACBrNFe.Configuracoes.Certificados.Senha  := AnsiString(req.GetValue<string>('certificadoSenha'));
+   ACBRNfe.Configuracoes.Geral.CSC           := req.GetValue<String>('codCSC') ; // Token para emissao do QRCODE nfce, usuario precisa passar
+   ACBRNfe.Configuracoes.WebServices.UF      := req.GetValue<String>('cUF');
+
+   NotaF := ACBrNFe.NotasFiscais.Add;
+   NotaF.NFe.Ide.natOp     := req.GetValue<String>('natOp');
+   NotaF.NFe.Ide.indPag    := StrToIndpag(ok, req.GetValue<String>('indPag'));  // ['0', '1', '2', ''], [ipVista, ipPrazo, ipOutras, ipNenhum]);
+   if not ok then raise Exception.Create('indPag9 incorreto!');
+   NotaF.NFe.Ide.modelo    := 55;
+   NotaF.NFe.Ide.serie     := req.GetValue<Integer>('serie');
+   NotaF.NFe.Ide.nNF       := req.GetValue<Integer>('nNF');
+   NotaF.NFe.Ide.cNF       := GerarCodigoDFe(NotaF.NFe.Ide.nNF);
+   NotaF.NFe.Ide.dEmi      := Date;
+   NotaF.NFe.Ide.dSaiEnt   := Date;
+   NotaF.NFe.Ide.hSaiEnt   := Now;
+   NotaF.NFe.Ide.tpNF      := StrToTpNF(ok, req.GetValue<String>('tpNF')); //  ['0', '1'], [tnEntrada, tnSaida]);
+   if not ok then raise Exception.Create('tpNF incorreto');
+   NotaF.NFe.Ide.tpEmis    := StrToTpEmis(ok, req.GetValue<String>('tpEmis')); // teNormal, teContingencia, teSCAN, teDPEC, teFSDA, teSVCAN, teSVCRS, teSVCSP, teOffLine
+   if not ok then raise Exception.Create('tpEmis incorreto');
+   NotaF.NFe.Ide.tpAmb     := StrToTpAmb(ok, req.GetValue<String>('ambiente'));  // ['1', '2'], [taProducao, taHomologacao]);
+   if not ok then raise Exception.Create('ambiente incorreto');
+   NotaF.NFe.Ide.verProc   := '1.0.0.0'; //Versão do seu sistema
+   NotaF.NFe.Ide.cUF       := UFtoCUF(req.GetValue<String>('cUF'));
+   NotaF.NFe.Ide.cMunFG    := req.GetValue<Integer>('cMunFG');
+   NotaF.NFe.Ide.indFinal  := StrToConsumidorFinal(ok,req.GetValue<String>('indFinal')); //['0', '1'],[cfNao, cfConsumidorFina]
+   if not ok then raise Exception.Create('indFinal incorreto');
+   NotaF.NFe.Ide.finNFe    := StrToFinNFe(ok,req.GetValue<String>('finalidadeNFe')); // ['1', '2', '3', '4'],  [fnNormal, fnComplementar, fnAjuste, fnDevolucao])
+   if  Assigned( ACBrNFe.DANFE ) then
+    NotaF.NFe.Ide.tpImp    := ACBrNFe.DANFE.TipoDANFE;
+
+   // Valores aceitos:
+   // iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador
+   // NotaF.NFe.Ide.indIntermed := iiSemOperacao;
+
+   // NotaF.NFe.Ide.dhCont := date;
+   // NotaF.NFe.Ide.xJust  := 'Justificativa Contingencia';
+
+   {
+   abaixo o campo incluido no layout a partir da NT 2020/006
+   }
+   {
+   valores aceitos pelo campo:
+   iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador
+   }
+   // Indicador de intermediador/marketplace
+
+   //NotaF.NFe.Ide.indIntermed := StrToIndIntermed(Ok,req.GetValue<String>('indIntermediador'));  //['', '0', '1'],  [iiSemOperacao, iiOperacaoSemIntermediador, iiOperacaoComIntermediador]);
+   //if not ok then raise Exception.Create('indIntermediador incorreto !');
+
+
+
+   //Para NFe referenciada use os campos abaixo
+   (*
+   Referenciada := NotaF.NFe.Ide.NFref.Add;
+   Referenciada.refNFe       := ''; //NFe Eletronica
+
+   Referenciada.RefNF.cUF    := 0;  // |
+   Referenciada.RefNF.AAMM   := ''; // |
+   Referenciada.RefNF.CNPJ   := ''; // |
+   Referenciada.RefNF.modelo := 1;  // |- NFe Modelo 1/1A
+   Referenciada.RefNF.serie  := 1;  // |
+   Referenciada.RefNF.nNF    := 0;  // |
+
+   Referenciada.RefNFP.cUF     := 0;  // |
+   Referenciada.RefNFP.AAMM    := ''; // |
+   Referenciada.RefNFP.CNPJCPF := ''; // |
+   Referenciada.RefNFP.IE      := ''; // |- NF produtor Rural
+   Referenciada.RefNFP.modelo  := ''; // |
+   Referenciada.RefNFP.serie   := 1;  // |
+   Referenciada.RefNFP.nNF     := 0;  // |
+
+   Referenciada.RefECF.modelo  := ECFModRef2B; // |
+   Referenciada.RefECF.nECF    := '';          // |- Cupom Fiscal
+   Referenciada.RefECF.nCOO    := '';          // |
+   *)
+   reqEmit := req.GetValue<TJSONObject>('emitente');
+   NotaF.NFe.Emit.CNPJCPF           := reqEmit.GetValue<String>('CNPJCPF');
+   if NotaF.NFe.Emit.CNPJCPF    <> GlobalConfig.cnpj then raise Exception.Create('Emitente não confere com o autorizado!');
+   NotaF.NFe.Emit.IE                := reqEmit.GetValue<String>('IE');
+   NotaF.NFe.Emit.xNome             := reqEmit.GetValue<String>('razaoSocial');
+   NotaF.NFe.Emit.xFant             := reqEmit.GetValue<String>('nomeFantasia');
+
+   reqEmitEnde :=  reqEmit.GetValue<TJSONObject>('endereco');
+   NotaF.NFe.Emit.EnderEmit.fone    := reqEmitEnde.GetValue<String>('fone');
+   NotaF.NFe.Emit.EnderEmit.CEP     := reqEmitEnde.GetValue<Integer>('CEP');
+   NotaF.NFe.Emit.EnderEmit.xLgr    := reqEmitEnde.GetValue<String>('logradouro');
+   NotaF.NFe.Emit.EnderEmit.nro     := reqEmitEnde.GetValue<String>('numero');
+   NotaF.NFe.Emit.EnderEmit.xCpl    := reqEmitEnde.GetValue<String>('complemento');
+   NotaF.NFe.Emit.EnderEmit.xBairro := reqEmitEnde.GetValue<String>('bairro');
+   NotaF.NFe.Emit.EnderEmit.cMun    := reqEmitEnde.GetValue<Integer>('codMunicipio');
+   NotaF.NFe.Emit.EnderEmit.xMun    := reqEmitEnde.GetValue<String>('nomeMunicipio');
+   NotaF.NFe.Emit.EnderEmit.UF      := reqEmitEnde.GetValue<String>('UF');
+   NotaF.NFe.Emit.enderEmit.cPais   := 1058;
+   NotaF.NFe.Emit.enderEmit.xPais   := 'BRASIL';
+
+   NotaF.NFe.Emit.IEST              := '';
+   //  NotaF.NFe.Emit.IM                := '2648800'; // Preencher no caso de existir serviços na nota
+   //  NotaF.NFe.Emit.CNAE              := '6201500'; // Verifique na cidade do emissor da NFe se é permitido
+                         // a inclusão de serviços na NFe
+
+   // esta sendo somando 1 uma vez que o ItemIndex inicia do zero e devemos
+   // passar os valores 1, 2 ou 3
+   // (1-crtSimplesNacional, 2-crtSimplesExcessoReceita, 3-crtRegimeNormal)
+   NotaF.NFe.Emit.CRT  := StrToCRT(Ok, IntToStr(reqEmit.GetValue<Integer>('CRT')));
+
+   //Para NFe Avulsa preencha os campos abaixo
+
+   //  NotaF.NFe.Avulsa.CNPJ    := '';
+   //  NotaF.NFe.Avulsa.xOrgao  := '';
+   //  NotaF.NFe.Avulsa.matr    := '';
+   //  NotaF.NFe.Avulsa.xAgente := '';
+   //  NotaF.NFe.Avulsa.fone    := '';
+   //  NotaF.NFe.Avulsa.UF      := '';
+   //  NotaF.NFe.Avulsa.nDAR    := '';
+   //  NotaF.NFe.Avulsa.dEmi    := now;
+   //  NotaF.NFe.Avulsa.vDAR    := 0;
+   //  NotaF.NFe.Avulsa.repEmi  := '';
+   //  NotaF.NFe.Avulsa.dPag    := now;
+
+   reqDest                          := req.GetValue<TJSONObject>('destinatario');
+   NotaF.NFe.Dest.CNPJCPF           := reqDest.GetValue<String>('CNPJCPF');
+   NotaF.NFe.Dest.indIEDest         := StrToindIEDest(ok,reqDest.GetValue<String>('indIEDest')); //['1', '2', '9'], [inContribuinte, inIsento, inNaoContribuinte]);
+   if not ok then raise Exception.Create('indIEDest incorreto.');
+   if NotaF.NFe.Dest.indIEDest = inContribuinte then
+   NotaF.NFe.Dest.IE                := reqDest.GetValue<String>('IE');
+   NotaF.NFe.Dest.ISUF              := reqDest.GetValue<String>('ISUF');
+   NotaF.NFe.Dest.xNome             := reqDest.GetValue<String>('nome');
+
+   reqDestEnde                      := reqDest.GetValue<TJSONObject>('endereco');
+   NotaF.NFe.Dest.EnderDest.Fone    := reqDestEnde.GetValue<String>('fone');
+   NotaF.NFe.Dest.EnderDest.CEP     := reqDestEnde.GetValue<Integer>('CEP');
+   NotaF.NFe.Dest.EnderDest.xLgr    := reqDestEnde.GetValue<String>('logradouro');
+   NotaF.NFe.Dest.EnderDest.nro     := reqDestEnde.GetValue<String>('numero');
+   NotaF.NFe.Dest.EnderDest.xCpl    := reqDestEnde.GetValue<String>('complemento');
+   NotaF.NFe.Dest.EnderDest.xBairro := reqDestEnde.GetValue<String>('bairro');
+   NotaF.NFe.Dest.EnderDest.cMun    := reqDestEnde.GetValue<Integer>('codMunicipio');
+   NotaF.NFe.Dest.EnderDest.xMun    := reqDestEnde.GetValue<String>('nomeMunicipio');
+   NotaF.NFe.Dest.EnderDest.UF      := reqDestEnde.GetValue<String>('UF');;
+   NotaF.NFe.Dest.EnderDest.cPais   := 1058;
+   NotaF.NFe.Dest.EnderDest.xPais   := 'BRASIL';
+
+   if containsProperty(req,'entrega') then begin
+
+     reqEntrega := req.GetValue<TJSONObject>('entrega');
+
+      case AnsiIndexStr(UpperCase(reqEntrega.GetValue<string>('tipo')),['RETIRADA','ENTREGA']) of
+
+         0: begin //Use os campos abaixo para informar o endereço de retirada quando for diferente do Remetente/Destinatário
+            NotaF.NFe.Retirada.CNPJCPF := reqEntrega.GetValue<String>('CNPJCPF');
+            NotaF.NFe.Retirada.xLgr    := reqEntrega.GetValue<String>('logradouro');
+            NotaF.NFe.Retirada.nro     := reqEntrega.GetValue<String>('numero');
+            NotaF.NFe.Retirada.xCpl    := reqEntrega.GetValue<String>('complemento');
+            NotaF.NFe.Retirada.xBairro := reqEntrega.GetValue<String>('bairro');
+            NotaF.NFe.Retirada.Cep     := reqEntrega.GetValue<Integer>('CEP');
+            NotaF.NFe.Retirada.cMun    := reqEntrega.GetValue<Integer>('codMunicipio');
+            NotaF.NFe.Retirada.xMun    := reqEntrega.GetValue<String>('nomeMunicipio');
+            NotaF.NFe.Retirada.UF      := reqEntrega.GetValue<String>('UF');
+         end;
+
+         1 : begin //Use os campos abaixo para informar o endereço de entrega quando for diferente do Remetente/Destinatário
+            NotaF.NFe.Entrega.CNPJCPF := reqEntrega.GetValue<String>('CNPJCPF');
+            NotaF.NFe.Entrega.xLgr    := reqEntrega.GetValue<String>('logradouro');
+            NotaF.NFe.Entrega.nro     := reqEntrega.GetValue<String>('numero');
+            NotaF.NFe.Entrega.xCpl    := reqEntrega.GetValue<String>('complemento');
+            NotaF.NFe.Entrega.xBairro := reqEntrega.GetValue<String>('bairro');
+            NotaF.NFe.Entrega.Cep     := reqEntrega.GetValue<Integer>('CEP');
+            NotaF.NFe.Entrega.cMun    := reqEntrega.GetValue<Integer>('codMunicipio');
+            NotaF.NFe.Entrega.xMun    := reqEntrega.GetValue<String>('nomeMunicipio');
+            NotaF.NFe.Entrega.UF      := reqEntrega.GetValue<String>('UF');
+         end;
+      end;
+   end;
+
+   arrProdutos := req.GetValue<TJSONArray>('produtos');
+
+   for var I := 0 to arrProdutos.Count -1 do begin
+      //Adicionando Produtos
+      Produto := NotaF.NFe.Det.New;
+      Produto.Prod.nItem    := I + 1; // Número sequencial, para cada item deve ser incrementado
+      Produto.Prod.cProd    := arrProdutos.Items[i].GetValue<String>('codigo');
+      Produto.Prod.cEAN     := arrProdutos.Items[i].GetValue<String>('EAN');
+      Produto.Prod.xProd    := arrProdutos.Items[i].GetValue<String>('descricao');
+      Produto.Prod.NCM      := arrProdutos.Items[i].GetValue<String>('NCM');
+      Produto.Prod.EXTIPI   := arrProdutos.Items[i].GetValue<String>('extIPI');
+      Produto.Prod.CFOP     := arrProdutos.Items[i].GetValue<String>('CFOP');
+      Produto.Prod.uCom     := arrProdutos.Items[i].GetValue<String>('unidade'); // UN
+      Produto.Prod.qCom     := arrProdutos.Items[i].GetValue<Integer>('quantidade');
+      Produto.Prod.vUnCom   := arrProdutos.Items[i].GetValue<Double>('valorUnitarioComerc');
+      Produto.Prod.vProd    := arrProdutos.Items[i].GetValue<Currency>('valorTotalProdutos');
+
+      Produto.Prod.cEANTrib  := arrProdutos.Items[i].GetValue<String>('EANTrib');
+      Produto.Prod.uTrib     := arrProdutos.Items[i].GetValue<String>('unidadeTrib');
+      Produto.Prod.qTrib     := arrProdutos.Items[i].GetValue<Integer>('quantidadeTrib');
+      Produto.Prod.vUnTrib   := arrProdutos.Items[i].GetValue<Double>('valorUnitarioTrib');
+
+      Produto.Prod.vOutro    := arrProdutos.Items[i].GetValue<Currency>('valorOutro',0);
+      Produto.Prod.vFrete    := arrProdutos.Items[i].GetValue<Currency>('valorFrete',0);
+      Produto.Prod.vSeg      := arrProdutos.Items[i].GetValue<Currency>('valorSeguro',0);
+      Produto.Prod.vDesc     := arrProdutos.Items[i].GetValue<Currency>('valorDesconto',0);
+
+      Produto.Prod.CEST := arrProdutos.Items[i].GetValue<String>('CEST', '');
+
+      Produto.infAdProd := arrProdutos.Items[i].GetValue<String>('infAdProd');
+
+      {
+       abaixo os campos incluidos no layout a partir da NT 2020/005
+      }
+      // Opcional - Preencher com o Código de Barras próprio ou de terceiros que seja diferente do padrão GTIN
+      // por exemplo: código de barras de catálogo, partnumber, etc
+      Produto.Prod.cBarra := arrProdutos.Items[i].GetValue<String>('codBarra');
+      // Opcional - Preencher com o Código de Barras próprio ou de terceiros que seja diferente do padrão GTIN
+      //  correspondente àquele da menor unidade comercializável identificado por Código de Barras
+      // por exemplo: código de barras de catálogo, partnumber, etc
+      Produto.Prod.cBarraTrib := arrProdutos.Items[i].GetValue<String>('codBarraTrib');
+
+      // Declaração de Importação. Pode ser adicionada várias através do comando Prod.DI.Add
+      (*
+      DI := Produto.Prod.DI.Add;
+      DI.nDi         := '';
+      DI.dDi         := now;
+      DI.xLocDesemb  := '';
+      DI.UFDesemb    := '';
+      DI.dDesemb     := now;
+      {
+       tvMaritima, tvFluvial, tvLacustre, tvAerea, tvPostal, tvFerroviaria, tvRodoviaria,
+
+       abaixo os novos valores incluidos a partir da NT 2020/005
+
+       tvConduto, tvMeiosProprios, tvEntradaSaidaFicta, tvCourier, tvEmMaos, tvPorReboque
+      }
+      DI.tpViaTransp := tvRodoviaria;
+      DI.vAFRMM := 0;
+      {
+       tiContaPropria, tiContaOrdem, tiEncomenda
+      }
+      DI.tpIntermedio := tiContaPropria;
+      DI.CNPJ := '';
+      DI.UFTerceiro := '';
+      DI.cExportador := '';
+
+      Adicao := DI.adi.Add;
+      Adicao.nAdicao     := 1;
+      Adicao.nSeqAdi     := 1;
+      Adicao.cFabricante := '';
+      Adicao.vDescDI     := 0;
+      Adicao.nDraw       := '';
+      *)
+
+      if containsProperty(TJSONObject.ParseJSONValue(TEncoding.UTF8.GetBytes(arrProdutos.Items[i].ToJSON), 0) as TJSONObject,'veiculo') then begin
+         var reqVeiculo :=  arrProdutos.Items[i].GetValue<TJSONObject>('veiculo') ;
+         //Campos para venda de veículos novos
+         Produto.Prod.veicProd.tpOP     := StrTotpOP(Ok,reqVeiculo.GetValue<string>('tipoOperacao')); // ['1', '2', '3', '0'], [toVendaConcessionaria, toFaturamentoDireto, toVendaDireta, toOutros]);
+         if not ok then raise Exception.Create('tipoOperacao incorreto!');
+         Produto.Prod.veicProd.chassi   := reqVeiculo.GetValue<String>('chassi');
+         Produto.Prod.veicProd.cCor     := reqVeiculo.GetValue<String>('cor');
+         Produto.Prod.veicProd.xCor     := reqVeiculo.GetValue<String>('cor');
+         Produto.Prod.veicProd.pot      := reqVeiculo.GetValue<String>('pot');
+         Produto.Prod.veicProd.Cilin    := reqVeiculo.GetValue<String>('cilin');
+         Produto.Prod.veicProd.pesoL    := reqVeiculo.GetValue<String>('pesoL');
+         Produto.Prod.veicProd.pesoB    := reqVeiculo.GetValue<String>('pesoB');
+         Produto.Prod.veicProd.nSerie   := reqVeiculo.GetValue<String>('nSerie');
+         Produto.Prod.veicProd.tpComb   := reqVeiculo.GetValue<String>('tipoCombustivel');
+         Produto.Prod.veicProd.nMotor   := reqVeiculo.GetValue<String>('motor');
+         Produto.Prod.veicProd.CMT      := reqVeiculo.GetValue<String>('CMT');
+         Produto.Prod.veicProd.dist     := reqVeiculo.GetValue<String>('dist');
+         Produto.Prod.veicProd.anoMod   := reqVeiculo.GetValue<Integer>('anoMod');
+         Produto.Prod.veicProd.anoFab   := reqVeiculo.GetValue<Integer>('anoFab');
+         Produto.Prod.veicProd.tpPint   := reqVeiculo.GetValue<String>('tipoPint');
+         Produto.Prod.veicProd.tpVeic   := reqVeiculo.GetValue<Integer>('tipoVeic');
+         Produto.Prod.veicProd.espVeic  := reqVeiculo.GetValue<Integer>('espVeic');
+         Produto.Prod.veicProd.VIN      := reqVeiculo.GetValue<String>('VIN');
+         Produto.Prod.veicProd.condVeic := StrTocondVeic(ok,reqVeiculo.GetValue<String>('condicaoVeiculo')); // ['1', '2', '3'], [cvAcabado, cvInacabado, cvSemiAcabado]);
+         if not ok then raise Exception.Create('condicaoVeiculo incorreto!');
+         Produto.Prod.veicProd.cMod     := reqVeiculo.GetValue<String>('modelo');
+      end;
+
+      // Campos de Rastreabilidade do produto
+      {
+      O grupo <rastro> permiti a rastreabilidade de qualquer produto sujeito a
+      regulações sanitárias, casos de recolhimento/recall, além de defensivos agrícolas,
+      produtos veterinários, odontológicos, medicamentos, bebidas, águas envasadas,
+      embalagens, etc., a partir da indicação de informações de número de lote,
+      data de fabricação/produção, data de validade, etc.
+      Obrigatório o preenchimento deste grupo no caso de medicamentos e
+      produtos farmacêuticos.
+      }
+
+      // Ocorrências: 0 - 500
+      (*
+      Rastro := Produto.Prod.rastro.Add;
+
+      Rastro.nLote  := '17H8F5';
+      Rastro.qLote  := 1;
+      Rastro.dFab   := StrToDate('01/08/2017');
+      Rastro.dVal   := StrToDate('01/08/2019');
+      Rastro.cAgreg := ''; // Código de Agregação (opcional) de 1 até 20 dígitos
+      *)
+
+      //Campos específicos para venda de medicamentos
+
+      // Ocorrências: 1 - 500 ==> 1 - 1 (4.00)
+      (*
+      Medicamento := Produto.Prod.med.Add;
+
+      Medicamento.cProdANVISA := '1256802470029';
+      Medicamento.vPMC        := 100.00; // Preço máximo consumidor
+      *)
+
+      //Campos específicos para venda de armamento
+      (*
+      Arma := Produto.Prod.arma.Add;
+      Arma.nSerie := 0;
+      Arma.tpArma := taUsoPermitido;
+      Arma.nCano  := 0;
+      Arma.descr  := '';
+      *)
+      if containsProperty(TJSONObject.ParseJSONValue(TEncoding.UTF8.GetBytes(arrProdutos.Items[i].ToJSON), 0) as TJSONObject,'combustivel') then begin
+        //Campos específicos para venda de combustível(distribuidoras)
+
+         var reqCombustivel := arrProdutos.Items[i].GetValue<TJSONObject>('combustivel');
+         Produto.Prod.comb.cProdANP := reqCombustivel.GetValue<Integer>('codigoANP');
+         Produto.Prod.comb.CODIF    := reqCombustivel.GetValue<String>('codIF');
+         Produto.Prod.comb.qTemp    := reqCombustivel.GetValue<Currency>('qTemp');
+         Produto.Prod.comb.UFcons   := reqCombustivel.GetValue<String>('UFcons');
+
+         var reqCide := reqCombustivel.GetValue<TJSONObject>('CIDE');
+         Produto.Prod.comb.CIDE.qBCprod   := reqCide.GetValue<Currency>('qBCprod');
+         Produto.Prod.comb.CIDE.vAliqProd := reqCide.GetValue<Currency>('aliqProd');
+         Produto.Prod.comb.CIDE.vCIDE     := reqCide.GetValue<Currency>('vCIDE');
+
+         var reqICMS := reqCombustivel.GetValue<TJSONObject>('ICMS');
+         Produto.Prod.comb.ICMS.vBCICMS   := reqICMS.GetValue<Currency>('vBCICMS');
+         Produto.Prod.comb.ICMS.vICMS     := reqICMS.GetValue<Currency>('vICMS');
+         Produto.Prod.comb.ICMS.vBCICMSST := reqICMS.GetValue<Currency>('vBCICMSST');
+         Produto.Prod.comb.ICMS.vICMSST   := reqICMS.GetValue<Currency>('vICMSST');
+
+         var reqICMSInter := reqCombustivel.GetValue<TJSONObject>('ICMSInter');
+         Produto.Prod.comb.ICMSInter.vBCICMSSTDest := reqICMSInter.GetValue<Currency>('vBCICMSSTDest');
+         Produto.Prod.comb.ICMSInter.vICMSSTDest   := reqICMSInter.GetValue<Currency>('vICMSSTDest');
+
+         var reqICMSCons := reqCombustivel.GetValue<TJSONObject>('ICMSCons');
+         Produto.Prod.comb.ICMSCons.vBCICMSSTCons := reqICMSCons.GetValue<Currency>('vBCICMSSTCons');
+         Produto.Prod.comb.ICMSCons.vICMSSTCons   := reqICMSCons.GetValue<Currency>('vICMSSTCons');
+         Produto.Prod.comb.ICMSCons.UFcons        := reqICMSCons.GetValue<String>('UFcons');
+      end;
+
+
+      with Produto.Imposto do
+      begin
+         var reqImposto := arrProdutos.Items[i].GetValue<TJSONObject>('imposto');
+         // lei da transparencia nos impostos
+         vTotTrib := reqImposto.GetValue<Currency>('vTotTrib');
+         var reqICMS := reqImposto.GetValue<TJSONObject>('ICMS', Nil);
+         if reqICMS <> Nil then begin
+
+            with ICMS do
+            begin
+               // caso o CRT seja:
+               // 1=Simples Nacional
+               // Os valores aceitos para CSOSN são:
+               // csosn101, csosn102, csosn103, csosn201, csosn202, csosn203,
+               // csosn300, csosn400, csosn500,csosn900
+
+               // 2=Simples Nacional, excesso sublimite de receita bruta;
+               // ou 3=Regime Normal.
+               // Os valores aceitos para CST são:
+               // cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
+               // cst60, cst70, cst80, cst81, cst90, cstPart10, cstPart90,
+               // cstRep41, cstVazio, cstICMSOutraUF, cstICMSSN, cstRep60
+
+               // (consulte o contador do seu cliente para saber qual deve ser utilizado)
+               // Pode variar de um produto para outro.
+
+               orig := StrToOrig(ok,reqImposto.GetValue<String>('origemMercadoria')) ;
+               if not ok then raise Exception.Create('origemMercadoria incorreto!');
+
+               { orig = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ''],
+               [oeNacional, oeEstrangeiraImportacaoDireta, oeEstrangeiraAdquiridaBrasil,
+               oeNacionalConteudoImportacaoSuperior40, oeNacionalProcessosBasicos,
+               oeNacionalConteudoImportacaoInferiorIgual40,
+               oeEstrangeiraImportacaoDiretaSemSimilar, oeEstrangeiraAdquiridaBrasilSemSimilar,
+               oeNacionalConteudoImportacaoSuperior70, oeReservadoParaUsoFuturo,
+               oeVazio]); }
+
+               //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
+               (*
+               CST       := cst02;
+               qBCMono   := 100;
+               adRemICMS := 10;
+               vICMSMono := 10;
+               *)
+               //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
+               (*
+               CST          := cst15;
+               qBCMono      := 100;
+               adRemICMS    := 10;
+               vICMSMono    := 10;
+               qBCMonoReten := 100;
+               adRemICMSReten := 10;
+               vICMSMonoReten := 10;
+               pRedAdRem      := 10;
+               motRedAdRem    := TmotRedAdRem.motTranspColetivo;
+               *)
+               //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
+               (*
+               CST           := cst53;
+               qBCMono       := 100;
+               adRemICMS     := 10;
+               vICMSMonoOp   := 10;
+               pDif          := 10;
+               vICMSMonoDif  := 1;
+               vICMSMono     := 10;
+               *)
+               //Grupo de Tributação do ICMS Monofásico sobre combustíveis.
+               (*
+               CST           := cst61;
+               qBCMonoRet    := 100;
+               adRemICMSRet  := 10;
+               vICMSMonoRet  := 10;
+               *)
+
+               if NotaF.NFe.Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then
+               begin
+                  CST  := StrToCSTICMS(ok,reqICMS.GetValue<string>('CST'));
+                  if not ok then raise Exception.Create('CST incorreto!');
+                  { ['', '00', '10', '20', '30', '40', '41', '45', '50', '51',
+                                     '60', '70', '80', '81', '90', '90', 'SN',
+                                     '10', '90', '41', '60', '02', '15', '53', '61'],
+                                    [cstVazio, cst00, cst10, cst20, cst30, cst40, cst41, cst45, cst50, cst51,
+                                    cst60, cst70, cst80, cst81, cst90, cstICMSOutraUF, cstICMSSN,
+                                    cstPart10, cstPart90, cstRep41, cstRep60,
+                                    cst02, cst15, cst53, cst61]);}
+                  modBC   := StrTomodBC(Ok,reqICMS.GetValue<String>('modBC'));  //['0', '1', '2', '3', '']
+                  if not ok then raise Exception.Create('modBC incorreto!');
+                  vBC     := reqICMS.GetValue<Currency>('vBC');
+                  pICMS   := reqICMS.GetValue<Currency>('pICMS');
+                  vICMS   := reqICMS.GetValue<Currency>('vICMS');
+                  modBCST := dbisMargemValorAgregado;
+                  pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
+                  pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
+                  vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
+                  pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
+                  vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
+                  pRedBC  := reqICMS.GetValue<Currency>('pRedBC');
+               end
+               else
+               begin
+                  CSOSN   := StrToCSOSNIcms(ok,reqICMS.GetValue<string>('CSOSN')); // [ '','101', '102', '103', '201', '202', '203', '300', '400', '500','900'], [csosnVazio, csosn101, csosn102, csosn103, csosn201, csosn202, csosn203, csosn300, csosn400, csosn500,csosn900]);
+                  if not ok then raise Exception.Create('CSOSN incorreto');
+                  modBC   := dbiValorOperacao;
+                  pCredSN := reqICMS.GetValue<Currency>('pCredSN',0);
+                  vCredICMSSN := 100 * pCredSN / 100;;
+                  vBC     := reqICMS.GetValue<Currency>('vBC');
+                  pICMS   := reqICMS.GetValue<Currency>('pICMS');
+                  vICMS   := reqICMS.GetValue<Currency>('vICMS');
+                  modBCST := dbisListaNeutra;
+                  pMVAST  := reqICMS.GetValue<Currency>('pMVAST',0);
+                  pRedBCST:= reqICMS.GetValue<Currency>('pRedBCST',0);
+                  vBCST   := reqICMS.GetValue<Currency>('vBCST',0);
+                  pICMSST := reqICMS.GetValue<Currency>('pICMSST',0);
+                  vICMSST := reqICMS.GetValue<Currency>('vICMSST',0);
+               end;
+
+               vBCFCPST        := reqICMS.GetValue<Currency>('vBCFCPST',0);
+               pFCPST          := reqICMS.GetValue<Currency>('pFCPST',0);
+               vFCPST          := reqICMS.GetValue<Currency>('vFCPST',0);
+               vBCSTRet        := reqICMS.GetValue<Currency>('vBCSTRet',0);
+               pST             := reqICMS.GetValue<Currency>('pST',0);
+               vICMSSubstituto := reqICMS.GetValue<Currency>('vICMSSubstituto',0);
+               vICMSSTRet      := reqICMS.GetValue<Currency>('vICMSSTRet',0);
+               vBCFCPSTRet     := reqICMS.GetValue<Currency>('vBCFCPSTRet',0);
+               pFCPSTRet       := reqICMS.GetValue<Currency>('pFCPSTRet',0);
+               vFCPSTRet       := reqICMS.GetValue<Currency>('vFCPSTRet',0);
+               pRedBCEfet      := reqICMS.GetValue<Currency>('pRedBCEfet',0);
+               vBCEfet         := reqICMS.GetValue<Currency>('vBCEfet',0);
+               pICMSEfet       := reqICMS.GetValue<Currency>('pICMSEfet',0);
+               vICMSEfet       := reqICMS.GetValue<Currency>('vICMSEfet',0);
+               pFCP            := reqIcms.GetValue<Integer>('pFCP',0);
+               vFCP            := reqIcms.GetValue<Currency>('vFCP',0);
+               motDesICMS      := StrTomotDesICMS(ok,reqIcms.GetValue<String>('motDesICMS'));
+               {
+                 abaixo os campos incluidos no layout a partir da NT 2020/005
+               }
+               // Informar apenas nos motivos de desoneração documentados abaixo
+               vICMSSTDeson := reqICMS.GetValue<Currency>('vICMSSTDeson',0);
+               {
+                 o campo abaixo só aceita os valores:
+                 mdiProdutorAgropecuario, mdiOutros, mdiOrgaoFomento
+                 Campo será preenchido quando o campo anterior estiver preenchido.
+               }
+               //motDesICMSST := mdiOutros;
+
+               // Percentual do diferimento do ICMS relativo ao Fundo de Combate à Pobreza (FCP).
+               // No caso de diferimento total, informar o percentual de diferimento "100"
+               pFCPDif := reqICMS.GetValue<Currency>('pFCPDif',0);
+               // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) diferido
+               vFCPDif := reqICMS.GetValue<Currency>('vFCPDif',0);
+               // Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) realmente devido.
+               vFCPEfet := reqICMS.GetValue<Currency>('vFCPEfet',0);
+            end;
+
+            var reqICMSUFDest := reqImposto.GetValue<TJSONObject>('ICMSUFDest');
+            with ICMSUFDest do
+            begin
+               // partilha do ICMS e fundo de probreza
+               vBCUFDest      := reqICMSUFDest.GetValue<Currency>('vBCUFDest');
+               pFCPUFDest     := reqICMSUFDest.GetValue<Currency>('pFCPUFDest');
+               pICMSUFDest    := reqICMSUFDest.GetValue<Currency>('pICMSUFDest');
+               pICMSInter     := reqICMSUFDest.GetValue<Currency>('pICMSInter');
+               pICMSInterPart := reqICMSUFDest.GetValue<Currency>('pICMSInterPart');
+               vFCPUFDest     := reqICMSUFDest.GetValue<Currency>('vFCPUFDest');
+               vICMSUFDest    := reqICMSUFDest.GetValue<Currency>('vICMSUFDest');
+               vICMSUFRemet   := reqICMSUFDest.GetValue<Currency>('vICMSUFRemet');
+            end;
+
+            var reqIPI := reqImposto.GetValue<TJSONObject>('IPI', Nil);
+            if reqIPI <> Nil then begin
+               with IPI do begin
+                  CST      := StrToCSTIPI(ok, reqIPI.GetValue<String>('CST')); // ['00', '49', '50', '99', '01', '02', '03', '04', '05', '51', '52', '53', '54', '55'],
+                  if not ok then raise Exception.Create('CST IPI incorreto!');
+                  clEnq    := reqIPI.GetValue<String>('clEnq');
+                  CNPJProd := reqIPI.GetValue<String>('CNPJProd');
+                  cSelo    := reqIPI.GetValue<String>('cSelo');
+                  qSelo    := reqIPI.GetValue<Integer>('qSelo');
+                  cEnq     := reqIPI.GetValue<String>('cEnq');
+                  vBC      := reqIPI.GetValue<Currency>('vBC');
+                  pIPI     := reqIPI.GetValue<Currency>('pIPI');
+                  vIPI     := reqIPI.GetValue<Currency>('vIPI');
+                  qUnid    := reqIPI.GetValue<Currency>('qUnid',0);
+                  vUnid    := reqIPI.GetValue<Currency>('vUnid',0);
+               end;
+            end;
+
+            var reqII := reqImposto.GetValue<TJSONObject>('II', Nil);
+            if reqII <> Nil then begin
+               with II do
+               begin
+                  II.vBc      :=  reqII.GetValue<Currency>('vBc');
+                  II.vDespAdu :=  reqII.GetValue<Currency>('vDespAdu');
+                  II.vII      :=  reqII.GetValue<Currency>('vII');
+                  II.vIOF     :=  reqII.GetValue<Currency>('vIOF');
+               end;
+            end;
+
+            var reqPis := reqImposto.GetValue<TJSONObject>('PIS', Nil);
+            if reqPis <> Nil then begin
+
+               with PIS do
+               begin
+                  CST  := StrToCSTPIS(ok,reqPis.GetValue<String>('CST'));
+                  if not ok then raise Exception.Create('CST PIS incorreto!');
+                  vBC  := reqPis.GetValue<Currency>('vBC');
+                  pPIS := reqPis.GetValue<Currency>('pPIS');
+                  vPIS := reqPis.GetValue<Currency>('vPIS');
+                  vPIS := reqPis.GetValue<Currency>('vPIS');
+                  //qBCProd   := reqPis.GetValue<Currency>('qBCProd');
+                  //vAliqProd := reqPis.GetValue<Currency>('vAliqProd');
+
+               end;
+            end;
+
+            var reqPisSt := reqImposto.GetValue<TJSONObject>('PISST', Nil);
+            if reqPisSt <> Nil then begin
+               with PISST do
+               begin
+                  vBc       := reqPisSt.GetValue<Currency>('vBc');
+                  pPis      := reqPisSt.GetValue<Currency>('pPis');
+                  qBCProd   := reqPisSt.GetValue<Currency>('qBCProd');
+                  vAliqProd := reqPisSt.GetValue<Currency>('vAliqProd');
+                  vPIS      := reqPisSt.GetValue<Currency>('vPIS');
+                  {
+                    abaixo o campo incluido no layout a partir da NT 2020/005
+                  }
+                  {
+                    valores aceitos pelo campo:
+                    ispNenhum, ispPISSTNaoCompoe, ispPISSTCompoe
+                  }
+                  // Indica se o valor do PISST compõe o valor total da NF-e
+                  IndSomaPISST := StrToindSomaPISST(ok,reqPisSt.GetValue<String>('indSomaPISST'));
+                  if not ok then raise Exception.Create('IndSomaPISST incorreto');
+               end;
+            end;
+
+            var reqCofins := reqImposto.GetValue<TJSONObject>('COFINS');
+            with COFINS do
+            begin
+               CST     := StrToCSTCOFINS(ok,reqCofins.GetValue<String>('CST'));  //cof01, cof02, cof03, cof04, cof05, cof06, cof07, cof08, cof09, cof49, cof50, cof51, cof52, cof53,
+               if not ok then raise Exception.Create('CST COFINS incorreto!');   //cof54, cof55, cof56, cof60, cof61, cof62, cof63, cof64, cof65, cof66, cof67, cof70, cof71, cof72, cof73, cof74, cof75, cof98, cof99
+               vBC     := reqCofins.GetValue<Currency>('vBC');
+               pCOFINS := reqCofins.GetValue<Currency>('pCOFINS');
+               vCOFINS := reqCofins.GetValue<Currency>('vCOFINS');
+               //qBCProd   := reqCofins.GetValue<Currency>('qBCProd');
+               //vAliqProd := reqCofins.GetValue<Currency>('vAliqProd');
+            end;
+
+            var reqCofinsSt := reqImposto.GetValue<TJSONObject>('COFINSST',Nil);
+            if reqCofinsSt <> Nil then begin
+               with COFINSST do
+               begin
+                  vBC       := reqCofinsSt.GetValue<Currency>('vBC');
+                  pCOFINS   := reqCofinsSt.GetValue<Currency>('pCOFINS');
+                  qBCProd   := reqCofinsSt.GetValue<Currency>('qBCProd');
+                  vAliqProd := reqCofinsSt.GetValue<Currency>('vAliqProd');
+                  vCOFINS   := reqCofinsSt.GetValue<Currency>('vCOFINS');
+                  {
+                    abaixo o campo incluido no layout a partir da NT 2020/005
+                  }
+                  {
+                    valores aceitos pelo campo:
+                    iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe
+                  }
+                  // Indica se o valor da COFINS ST compõe o valor total da NF-e
+                  indSomaCOFINSST :=  StrToindSomaCOFINSST(Ok,reqCofinsSt.GetValue<String>('indSomaCOFINSST')); // ['', '0', '1'],[iscNenhum, iscCOFINSSTNaoCompoe, iscCOFINSSTCompoe]);
+                  if not ok then raise Exception.Create('indSomaCONFINSST incorreto!');
+               end;
+            end;
+         end;
+      end;
+   end;
+
+   //Adicionando Serviços
+   (*
+   Servico := NotaF.Nfe.Det.Add;
+   Servico.Prod.nItem    := 1; // Número sequencial, para cada item deve ser incrementado
+   Servico.Prod.cProd    := '123457';
+   Servico.Prod.cEAN     := '';
+   Servico.Prod.xProd    := 'Descrição do Serviço';
+   Servico.Prod.NCM      := '99';
+   Servico.Prod.EXTIPI   := '';
+   Servico.Prod.CFOP     := '5933';
+   Servico.Prod.uCom     := 'UN';
+   Servico.Prod.qCom     := 1;
+   Servico.Prod.vUnCom   := 100;
+   Servico.Prod.vProd    := 100;
+
+   Servico.Prod.cEANTrib  := '';
+   Servico.Prod.uTrib     := 'UN';
+   Servico.Prod.qTrib     := 1;
+   Servico.Prod.vUnTrib   := 100;
+
+   Servico.Prod.vFrete    := 0;
+   Servico.Prod.vSeg      := 0;
+   Servico.Prod.vDesc     := 0;
+
+   Servico.infAdProd      := 'Informação Adicional do Serviço';
+
+   //Grupo para serviços
+   Servico.Imposto.ISSQN
+   Servico.Imposto.cSitTrib  := ISSQNcSitTribNORMAL;
+   Servico.Imposto.vBC       := 100;
+   Servico.Imposto.vAliq     := 2;
+   Servico.Imposto.vISSQN    := 2;
+   Servico.Imposto.cMunFG    := 3554003;
+   // Preencha este campo usando a tabela disponível
+   // em http://www.planalto.gov.br/Ccivil_03/LEIS/LCP/Lcp116.htm
+   Servico.Imposto.cListServ := '1402';
+
+   NotaF.NFe.Total.ISSQNtot.vServ   := 100;
+   NotaF.NFe.Total.ISSQNTot.vBC     := 100;
+   NotaF.NFe.Total.ISSQNTot.vISS    := 2;
+   NotaF.NFe.Total.ISSQNTot.vPIS    := 0;
+   NotaF.NFe.Total.ISSQNTot.vCOFINS := 0;
+
+   *)
+   var reqTotal := req.GetValue<TJSONObject>('total');
+   var reqTotalICMS := reqTotal.GetValue<TJSONObject>('ICMS');
+   if NotaF.NFe.Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then
+   begin
+      NotaF.NFe.Total.ICMSTot.vBC   := reqTotalICMS.GetValue<Currency>('vBC');
+      NotaF.NFe.Total.ICMSTot.vICMS := reqTotalICMS.GetValue<Currency>('vICMS');
+   end
+   else
+   begin
+      NotaF.NFe.Total.ICMSTot.vBC := 0;
+      NotaF.NFe.Total.ICMSTot.vICMS := 0;
+   end;
+
+   NotaF.NFe.Total.ICMSTot.vBCST   := reqTotalICMS.GetValue<Currency>('vBCST');
+   NotaF.NFe.Total.ICMSTot.vST     := reqTotalICMS.GetValue<Currency>('vST');
+   NotaF.NFe.Total.ICMSTot.vProd   := reqTotalICMS.GetValue<Currency>('vProd');
+   NotaF.NFe.Total.ICMSTot.vFrete  := reqTotalICMS.GetValue<Currency>('vFrete');
+   NotaF.NFe.Total.ICMSTot.vSeg    := reqTotalICMS.GetValue<Currency>('vSeg');
+   NotaF.NFe.Total.ICMSTot.vDesc   := reqTotalICMS.GetValue<Currency>('vDesc');
+   NotaF.NFe.Total.ICMSTot.vII     := reqTotalICMS.GetValue<Currency>('vII');
+   NotaF.NFe.Total.ICMSTot.vIPI    := reqTotalICMS.GetValue<Currency>('vIPI');
+   NotaF.NFe.Total.ICMSTot.vPIS    := reqTotalICMS.GetValue<Currency>('vPIS');
+   NotaF.NFe.Total.ICMSTot.vCOFINS := reqTotalICMS.GetValue<Currency>('vCOFINS');
+   NotaF.NFe.Total.ICMSTot.vOutro  := reqTotalICMS.GetValue<Currency>('vOutro');
+   NotaF.NFe.Total.ICMSTot.vNF     := reqTotalICMS.GetValue<Currency>('vNF');
+
+   // lei da transparencia de impostos
+   NotaF.NFe.Total.ICMSTot.vTotTrib := reqTotalICMS.GetValue<Currency>('vTotTrib');
+
+   // partilha do icms e fundo de probreza
+   NotaF.NFe.Total.ICMSTot.vFCPUFDest   := reqTotalICMS.GetValue<Currency>('vFCPUFDest');
+   NotaF.NFe.Total.ICMSTot.vICMSUFDest  := reqTotalICMS.GetValue<Currency>('vICMSUFDest');
+   NotaF.NFe.Total.ICMSTot.vICMSUFRemet := reqTotalICMS.GetValue<Currency>('vICMSUFRemet');
+
+   NotaF.NFe.Total.ICMSTot.vFCPST     := reqTotalICMS.GetValue<Currency>('vFCPST');
+   NotaF.NFe.Total.ICMSTot.vFCPSTRet  := reqTotalICMS.GetValue<Currency>('vFCPSTRet');
+
+   var reqTotalRetTrib := reqTotal.GetValue<TJSONOBJect>('retTrib', Nil);
+   if reqTotalRetTrib <> Nil then begin
+      NotaF.NFe.Total.retTrib.vRetPIS    := reqTotalRetTrib.GetValue<Currency>('vRetPIS');
+      NotaF.NFe.Total.retTrib.vRetCOFINS := reqTotalRetTrib.GetValue<Currency>('vRetCOFINS');
+      NotaF.NFe.Total.retTrib.vRetCSLL   := reqTotalRetTrib.GetValue<Currency>('vRetCSLL');
+      NotaF.NFe.Total.retTrib.vBCIRRF    := reqTotalRetTrib.GetValue<Currency>('vBCIRRF');
+      NotaF.NFe.Total.retTrib.vIRRF      := reqTotalRetTrib.GetValue<Currency>('vIRRF');
+      NotaF.NFe.Total.retTrib.vBCRetPrev := reqTotalRetTrib.GetValue<Currency>('vBCRetPrev');
+      NotaF.NFe.Total.retTrib.vRetPrev   := reqTotalRetTrib.GetValue<Currency>('vRetPrev');
+   end;
+
+   var reqTransportadora := req.GetValue<TJSONObject>('transportadora',Nil);
+   if reqTransportadora <> Nil then begin
+
+      NotaF.NFe.Transp.modFrete := StrTomodFrete(Ok,reqTransportadora.GetValue<string>('modFrete')); //EnumeradoToStr(t, ['0', '1', '2', '3', '4', '9'], [mfContaEmitente, mfContaDestinatario, mfContaTerceiros, mfProprioRemetente, mfProprioDestinatario, mfSemFrete]);
+      if not ok then raise Exception.Create('modFrete incorreto!');
+      NotaF.NFe.Transp.Transporta.CNPJCPF  := reqTransportadora.GetValue<String>('CNPJCPF');
+      NotaF.NFe.Transp.Transporta.xNome    := reqTransportadora.GetValue<String>('nome');
+      NotaF.NFe.Transp.Transporta.IE       := reqTransportadora.GetValue<String>('IE');
+      NotaF.NFe.Transp.Transporta.xEnder   := reqTransportadora.GetValue<String>('ender');
+      NotaF.NFe.Transp.Transporta.xMun     := reqTransportadora.GetValue<String>('mun');
+      NotaF.NFe.Transp.Transporta.UF       := reqTransportadora.GetValue<String>('UF');
+
+      var reqRetTransp := reqTransportadora.GetValue<TJSONObject>('retTransp');
+      NotaF.NFe.Transp.retTransp.vServ    := reqRetTransp.GetValue<Currency>('vServ');
+      NotaF.NFe.Transp.retTransp.vBCRet   := reqRetTransp.GetValue<Currency>('vBCRet');
+      NotaF.NFe.Transp.retTransp.pICMSRet := reqRetTransp.GetValue<Currency>('pICMSRet');
+      NotaF.NFe.Transp.retTransp.vICMSRet := reqRetTransp.GetValue<Currency>('vICMSRet');
+      NotaF.NFe.Transp.retTransp.CFOP     := reqRetTransp.GetValue<String>('CFOP');
+      NotaF.NFe.Transp.retTransp.cMunFG   := reqRetTransp.GetValue<Integer>('munFG');
+
+      var reqVolume := reqTransportadora.GetValue<TJSONObject>('volume');
+      Volume := NotaF.NFe.Transp.Vol.New;
+      Volume.qVol  := reqVolume.GetValue<Integer>('qVol');
+      Volume.esp   := reqVolume.GetValue<String>('esp');
+      Volume.marca := reqVolume.GetValue<String>('marca');
+      Volume.nVol  := reqVolume.GetValue<String>('nVol');
+      Volume.pesoL := reqVolume.GetValue<Double>('pesoL');
+      Volume.pesoB := reqVolume.GetValue<Double>('pesoB');
+   end;
+
+   //Lacres do volume. Pode ser adicionado vários
+   (*
+   Lacre := Volume.Lacres.Add;
+   Lacre.nLacre := '';
+   *)
+   var reqCobrancaFat := req.GetValue<TJSONOBject>('cobrancaFat',Nil);
+   if reqCobrancaFat <> Nil then begin
+      NotaF.NFe.Cobr.Fat.nFat  := reqCobrancaFat.GetValue<String>('numero'); // 'Numero da Fatura'
+      NotaF.NFe.Cobr.Fat.vOrig := reqCobrancaFat.GetValue<Currency>('vOrig');
+      NotaF.NFe.Cobr.Fat.vDesc := reqCobrancaFat.GetValue<Currency>('vDesc');
+      NotaF.NFe.Cobr.Fat.vLiq  := reqCobrancaFat.GetValue<Currency>('vLiq');
+   end;
+
+   var arrDuplicata := req.GetValue<TJSONArray>('cobrancaDuplicata', Nil);
+   if arrDuplicata <> Nil then begin
+      for var I := 0 to arrDuplicata.Count -1 do begin
+         Duplicata := NotaF.NFe.Cobr.Dup.New;
+         Duplicata.nDup  := arrDuplicata.Items[i].GetValue<String>('numero');
+         Duplicata.dVenc := arrDuplicata.Items[i].GetValue<TDateTime>('vencimento');
+         Duplicata.vDup  := arrDuplicata.Items[i].GetValue<Currency>('valor');
+      end;
+   end;
+
+   // O grupo infIntermed só deve ser gerado nos casos de operação não presencial
+   // pela internet em site de terceiros (Intermediadores).
+   //  NotaF.NFe.infIntermed.CNPJ := '';
+   //  NotaF.NFe.infIntermed.idCadIntTran := '';
+   var reqInfAdicional := req.GetValue<TJSONObject>('infAdicional');
+   NotaF.NFe.InfAdic.infCpl     :=  reqInfAdicional.GetValue<String>('infComplementar');
+   NotaF.NFe.InfAdic.infAdFisco :=  reqInfAdicional.GetValue<String>('infAdicionalFisco');
+
+   var arrReqObsComplementar := reqInfAdicional.GetValue<TJSONArray>('obsComplementar', Nil);
+   if arrReqObsComplementar <> Nil then begin
+      for var I := 0 to arrReqObsComplementar.Count - 1 do begin
+         ObsComplementar := NotaF.NFe.InfAdic.obsCont.New;
+         ObsComplementar.xCampo := arrReqObsComplementar.Items[I].GetValue<String>('campo');
+         ObsComplementar.xTexto := arrReqObsComplementar.Items[I].GetValue<String>('texto');
+      end;
+   end;
+
+   var arrReqObsFisco := reqInfAdicional.GetValue<TJSONArray>('obsFisco', Nil);
+   if arrReqObsFisco <> Nil then begin
+      for var I := 0 to arrReqObsFisco.Count -1 do begin
+         ObsFisco := NotaF.NFe.InfAdic.obsFisco.New;
+         ObsFisco.xCampo := arrReqObsFisco.Items[I].GetValue<String>('campo');
+         ObsFisco.xTexto := arrReqObsFisco.Items[I].GetValue<string>('texto');
+      end;
+   end;
+
+   //Processo referenciado
+   (*
+   ProcReferenciado := NotaF.Nfe.InfAdic.procRef.Add;
+   ProcReferenciado.nProc := '';
+   ProcReferenciado.indProc := ipSEFAZ;
+   *)
+   var reqExporta := req.GetValue<TJSONObject>('exporta',Nil);
+   if reqExporta <> Nil then begin
+      NotaF.NFe.exporta.UFembarq   := reqExporta.GetValue<String>('UFembarq');
+      NotaF.NFe.exporta.xLocEmbarq := reqExporta.GetValue<String>('locEmbarq');
+   end;
+
+   var reqCompra := req.GetValue<TJSONObject>('compra',Nil);
+   if reqCompra <> Nil then begin
+      NotaF.NFe.compra.xNEmp := reqCompra.GetValue<String>('nEmp');
+      NotaF.NFe.compra.xPed  := reqCompra.GetValue<String>('ped');
+      NotaF.NFe.compra.xCont := reqCompra.GetValue<String>('cont');
+   end;
+
+
+   // YA. Informações de pagamento
+   var reqArrPagamento := req.GetValue<TJSONArray>('pagamento');
+   for var I := 0 to reqArrPagamento.Count -1 do begin
+      InfoPgto := NotaF.NFe.pag.New;
+      InfoPgto.indPag := StrToIndpag(ok,reqArrPagamento.Items[i].GetValue<String>('condicao',emptyStr)); //StrToEnumerado(ok, s, ['0', '1', '2', ''], [ipVista, ipPrazo, ipOutras, ipNenhum]);
+      if not ok then raise Exception.Create('condicao pagamento incorreto!');
+      InfoPgto.tPag   := StrToFormaPagamento(Ok,reqArrPagamento.Items[i].GetValue<String>('forma'));
+      if not ok then raise Exception.Create('forma pagamento incorreto!');
+      {EnumeradoToStr(t, ['01', '02', '03', '04', '05', '10', '11', '12','13', '14', '15', '16', '17', '18', '19', '90','98', '99'],
+      [fpDinheiro, fpCheque, fpCartaoCredito, fpCartaoDebito,fpCreditoLoja, fpValeAlimentacao, fpValeRefeicao,
+      fpValePresente, fpValeCombustivel, fpDuplicataMercantil,fpBoletoBancario, fpDepositoBancario,fpPagamentoInstantaneo, fpTransfBancario,
+      fpProgramaFidelidade, fpSemPagamento, fpRegimeEspecial,fpOutro]);}
+      if reqArrPagamento.Items[i].GetValue<String>('condicao',emptyStr) = '2' then InfoPgto.xPag := 'pix';
+
+      InfoPgto.vPag   := reqArrPagamento.Items[i].GetValue<Currency>('valor');
+
+      // Exemplo de pagamento integrado.
+
+      // InfoPgto.indPag := ipVista;
+      // InfoPgto.tPag   := fpCartaoCredito;
+
+      {
+       abaixo o campo incluido no layout a partir da NT 2020/006
+      }
+      {
+       se tPag for fpOutro devemos incluir o campo xPag
+      InfoPgto.xPag := 'Caderneta';
+      }
+      if reqArrPagamento.Items[i].GetValue<Boolean>('integrado',false) then begin
+         InfoPgto.tpIntegra := StrTotpIntegra(Ok,reqArrPagamento.Items[i].GetValue<String>('tipoIntegracao')); // ['', '1', '2'], [tiNaoInformado, tiPagIntegrado, tiPagNaoIntegrado]);
+         if not ok then raise Exception.Create('tipoIntegracao incorreto!');
+         InfoPgto.CNPJ      := reqArrPagamento.Items[i].GetValue<String>('CNPJ');
+         InfoPgto.tBand     := StrToBandeiraCartao(ok,reqArrPagamento.Items[i].GetValue<String>('bandeiraCartao'));
+         {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16',
+         '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '99', ''],[bcVisa, bcMasterCard, bcAmericanExpress, bcSorocred,
+         bcDinersClub, bcElo, bcHipercard, bcAura, bcCabal,bcAlelo, bcBanesCard, bcCalCard, bcCredz, bcDiscover,
+         bcGoodCard, bcGreenCard, bcHiper, bcJcB, bcMais, bcMaxVan, bcPolicard, bcRedeCompras, bcSodexo,
+         bcValeCard, bcVerocheque, bcVR, bcTicket, bcOutros, TpcnBandeiraCartao(-1)]);}
+         if not ok then raise Exception.Create('bandeiraCartao incorreto!');
+         InfoPgto.cAut      := reqArrPagamento.Items[i].GetValue<String>('codAutorizacao');
+      end;
+
+      // YA09 Troco
+      // Regra opcional: Informar se valor dos pagamentos maior que valor da nota.
+      // Regra obrigatória: Se informado, Não pode diferir de "(+) vPag (id:YA03) (-) vNF (id:W16)"
+      //  NotaF.NFe.pag.vTroco := 75;
+
+   end;
+
+
+   {
+    abaixo o campo incluido no layout a partir da NT 2020/006
+   }
+   var reqInfIntermed := req.GetValue<TJSONObject>('infIntermediador',Nil);
+   if reqInfIntermed <> Nil then begin
+      NotaF.NFe.infIntermed.CNPJ := reqInfIntermed.GetValue<String>('CNPJ'); // CNPJ do Intermediador da Transação (agenciador, plataforma de delivery, marketplace e similar) de serviços e de negócios.
+      NotaF.NFe.infIntermed.idCadIntTran := reqInfIntermed.GetValue<String>('idCadIntTran');
+      // Nome do usuário ou identificação do perfil do vendedor no site do intermediador
+      // (agenciador, plataforma de delivery, marketplace e similar) de serviços e de
+      // negócios.
+   end;
+
+   ACBrNFe.NotasFiscais.GerarNFe;
+   result := EnviaNfe;
+
+end;
+
+
+function TEmiteNFe.EnviaNFe() : string;
+var pathSave, xml: string;
+begin
+    pathSave := profilePath + '\xmls\enviados\' + ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID +'.xml';
+    if not FileExists(pathSave) then begin
+
+       ACBrNFe.NotasFiscais.Assinar;
+       ACBrNFe.NotasFiscais.Validar;
+
+
+       ACBrNFe.Enviar(1, False, True);
+
+       ACbrNFe.NotasFiscais.GravarXML(pathSave);
+       xml := loadFile(pathSave);
+
+       var objResult := TJSONObject.Create;
+        try
+           objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
+           objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.tpAmb));
+           objResult.AddPair('verAplic',ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.verAplic);
+           objResult.AddPair('cStat',IntToStr(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cStat));
+           objResult.AddPair('xMotivo',ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMotivo);
+           objResult.AddPair('cMsg',IntToStr(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cMsg));
+           objResult.AddPair('xMsg',ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMsg);
+           objResult.AddPair('Protocolo',ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.nProt);
+           objResult.AddPair('profile',globalConfig.profile);
+           objResult.AddPair('xml',xml);
+           Result := objResult.ToString;
+        finally
+           objResult.Free;
+        end;
+    end else begin
+        xml := loadFile(pathSave);
+        var objResult := TJSONObject.Create;
+        try
+           objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
+           objResult.AddPair('profile',globalConfig.profile);
+           objResult.AddPair('xml',xml);
+           Result := objResult.ToString;
+        finally
+           objResult.Free;
+        end;
+    end;
+end;
+
+destructor TEmiteNfe.Destroy;
+begin
+   inherited;
+   GlobalConfig.profile := EmptyStr;
+   if Assigned(ACBrNFe) then ACBrNFe.Free;
+   if Assigned(ACBrMail) then ACBrMail.Free;
+end;
+
+end.
