@@ -22,7 +22,8 @@ type
       function EventoCartaCorrecao(req: TJSONObject): string;
       function InutilizaNumeracao(req: TJSONObject): string;
    private
-
+    function AlimentarNFe(req:TJSONObject) : string;
+    function AlimentarNFCe(req: TJSONObject) : string;
     function EnviaNFe : string;
     procedure LerConfiguracao(pathConfig:string);
     procedure ConfiguraAmbiente(profile:string);

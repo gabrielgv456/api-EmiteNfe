@@ -1907,6 +1907,10 @@ begin
       NotaF.NFe.Dest.EnderDest.UF      := reqNF.Destinatario.Endereco.UF;
       NotaF.NFe.Dest.EnderDest.cPais   := 1058;
       NotaF.NFe.Dest.EnderDest.xPais   := 'BRASIL';
+
+      if NotaF.NFe.Emit.EnderEmit.UF <> NotaF.NFe.Dest.EnderDest.UF then
+      NotaF.NFe.Ide.idDest := TpcnDestinoOperacao.doInterestadual
+
    end else begin
       if (NotaF.NFe.Ide.modelo = 55) then raise Exception.Create('Para nota fiscal modelo 55 é obrigatório informar o cliente!');
    end;
@@ -2057,7 +2061,7 @@ begin
          end;
 
          // PIS - PROGRAMA DE INTEGRAÇÃO SOCIAL
-         if assinged( reqProduto.imposto.PIS) then begin
+         if Assigned(reqProduto.imposto.PIS) then begin
             with PIS do
             begin
                CST  := StrToCSTPIS(ok,reqProduto.imposto.PIS.CST);
@@ -2069,7 +2073,7 @@ begin
          end;
 
          // COFINS - CONTRIBUIÇÃO PARA O FINANCIAMENTO DA SEGURIDADE SOCIAL
-         if reqProduto.imposto.COFINS.CST <> emptyStr then begin
+         if Assigned(reqProduto.imposto.COFINS) then begin
             with COFINS do
             begin
                CST     := StrToCSTCOFINS(ok, reqProduto.imposto.COFINS.CST);
