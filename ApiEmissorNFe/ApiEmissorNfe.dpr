@@ -18,7 +18,8 @@ uses
   uEmiteNfe in 'uEmiteNfe.pas',
   smNfe in 'smNfe.pas',
   JsonUtils in 'JsonUtils.pas',
-  uAuthJWT in 'uAuthJWT.pas';
+  uAuthJWT in 'uAuthJWT.pas',
+  nfDTO in 'nfDTO.pas';
 
 {$R *.res}
 

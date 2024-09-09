@@ -1,0 +1,163 @@
+unit nfDTO;
+
+type
+  TEnderecoDTO = class
+  private
+    FBairro: string;
+    FCEP: Integer;
+    FLogradouro: string;
+    FNomeMunicipio: string;
+    FUF: string;
+    FComplemento: Nullable<string>;
+    FNumero: string;
+    FCodMunicipio: Integer;
+    FFone: string;
+  public
+    property Bairro: string read FBairro write FBairro;
+    property CEP: Integer read FCEP write FCEP;
+    property Logradouro: string read FLogradouro write FLogradouro;
+    property NomeMunicipio: string read FNomeMunicipio write FNomeMunicipio;
+    property UF: string read FUF write FUF;
+    property Complemento: Nullable<string> read FComplemento write FComplemento;
+    property Numero: string read FNumero write FNumero;
+    property CodMunicipio: Integer read FCodMunicipio write FCodMunicipio;
+    property Fone: string read FFone write FFone;
+  end;
+
+  TEmitenteDTO = class
+  private
+    FCNPJCPF: string;
+    FCRT: Integer;
+    FNomeFantasia: string;
+    FIE: string;
+    FRazaoSocial: string;
+    FEndereco: TEnderecoDTO;
+  public
+    property CNPJCPF: string read FCNPJCPF write FCNPJCPF;
+    property CRT: Integer read FCRT write FCRT;
+    property NomeFantasia: string read FNomeFantasia write FNomeFantasia;
+    property IE: string read FIE write FIE;
+    property RazaoSocial: string read FRazaoSocial write FRazaoSocial;
+    property Endereco: TEnderecoDTO read FEndereco write FEndereco;
+  end;
+
+  TICMSDTO = class
+  private
+    FCSOSN: string;
+    FpICMS: Double;
+    FvICMS: Double;
+    FvBC: Double;
+  public
+    property CSOSN: string read FCSOSN write FCSOSN;
+    property pICMS: Double read FpICMS write FpICMS;
+    property vICMS: Double read FvICMS write FvICMS;
+    property vBC: Double read FvBC write FvBC;
+  end;
+
+  TImpostoDTO = class
+  private
+    FOrigemMercadoria: string;
+    FICMS: TICMSDTO;
+    FvTotTrib: Double;
+  public
+    property OrigemMercadoria: string read FOrigemMercadoria write FOrigemMercadoria;
+    property ICMS: TICMSDTO read FICMS write FICMS;
+    property vTotTrib: Double read FvTotTrib write FvTotTrib;
+  end;
+
+  TProdutoDTO = class
+  private
+    FDescricao: string;
+    FCodigo: string;
+    FQuantidade: Double;
+    FValorUnitarioComerc: Double;
+    FImposto: TImpostoDTO;
+  public
+    property Descricao: string read FDescricao write FDescricao;
+    property Codigo: string read FCodigo write FCodigo;
+    property Quantidade: Double read FQuantidade write FQuantidade;
+    property ValorUnitarioComerc: Double read FValorUnitarioComerc write FValorUnitarioComerc;
+    property Imposto: TImpostoDTO read FImposto write FImposto;
+  end;
+
+  TPagamentoDTO = class
+  private
+    FForma: string;
+    FCondicao: string;
+    FValor: Double;
+  public
+    property Forma: string read FForma write FForma;
+    property Condicao: string read FCondicao write FCondicao;
+    property Valor: Double read FValor write FValor;
+  end;
+
+  TInfAdicionalDTO = class
+  private
+    FInfAdicionalFisco: string;
+    FInfComplementar: string;
+  public
+    property InfAdicionalFisco: string read FInfAdicionalFisco write FInfAdicionalFisco;
+    property InfComplementar: string read FInfComplementar write FInfComplementar;
+  end;
+
+  TICMSTotalDTO = class
+  private
+    FvNF: Double;
+    FvBC: Double;
+    FvICMS: Double;
+  public
+    property vNF: Double read FvNF write FvNF;
+    property vBC: Double read FvBC write FvBC;
+    property vICMS: Double read FvICMS write FvICMS;
+  end;
+
+  TTotalDTO = class
+  private
+    FICMS: TICMSTotalDTO;
+  public
+    property ICMS: TICMSTotalDTO read FICMS write FICMS;
+  end;
+
+  TNotaFiscalDTO = class
+  private
+    FCertificadoSenha: string;
+    FCodCSC: string;
+    FAmbiente: string;
+    FcMunFG: Integer;
+    FcUF: string;
+    FFinalidadeNFe: string;
+    FIndFinal: string;
+    FIndPresenca: string;
+    FIndPag: string;
+    FNatOp: string;
+    FTpEmis: string;
+    FTpNF: Integer;
+    FSerie: Integer;
+    FnNF: Integer;
+    FEmitente: TEmitenteDTO;
+    FProdutos: TArray<TProdutoDTO>;
+    FPagamento: TArray<TPagamentoDTO>;
+    FInfAdicional: TInfAdicionalDTO;
+    FTotal: TTotalDTO;
+  public
+    property CertificadoSenha: string read FCertificadoSenha write FCertificadoSenha;
+    property CodCSC: string read FCodCSC write FCodCSC;
+    property Ambiente: string read FAmbiente write FAmbiente;
+    property cMunFG: Integer read FcMunFG write FcMunFG;
+    property cUF: string read FcUF write FcUF;
+    property FinalidadeNFe: string read FFinalidadeNFe write FFinalidadeNFe;
+    property IndFinal: string read FIndFinal write FIndFinal;
+    property IndPresenca: string read FIndPresenca write FIndPresenca;
+    property IndPag: string read FIndPag write FIndPag;
+    property NatOp: string read FNatOp write FNatOp;
+    property TpEmis: string read FTpEmis write FTpEmis;
+    property TpNF: Integer read FTpNF write FTpNF;
+    property Serie: Integer read FSerie write FSerie;
+    property nNF: Integer read FnNF write FnNF;
+    property Emitente: TEmitenteDTO read FEmitente write FEmitente;
+    property Produtos: TArray<TProdutoDTO> read FProdutos write FProdutos;
+    property Pagamento: TArray<TPagamentoDTO> read FPagamento write FPagamento;
+    property InfAdicional: TInfAdicionalDTO read FInfAdicional write FInfAdicional;
+    property Total: TTotalDTO read FTotal write FTotal;
+  end;
+
