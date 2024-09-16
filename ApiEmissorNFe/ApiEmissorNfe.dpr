@@ -19,7 +19,8 @@ uses
   smNfe in 'smNfe.pas',
   JsonUtils in 'JsonUtils.pas',
   uAuthJWT in 'uAuthJWT.pas',
-  nfDTO in 'nfDTO.pas';
+  nfDTO in 'nfDTO.pas',
+  uBkpEmiteNfe in 'uBkpEmiteNfe.pas';
 
 {$R *.res}
 

@@ -2,11 +2,22 @@ unit uBkpEmiteNfe;
 
 interface
 
+uses
+   ACBRNfe, ACBrNFeNotasFiscais, pcnNFe, pcnConversao, JSON, pcnConversaoNFE,
+   System.SysUtils, System.StrUtils, ACBrDFeUtil, //SHDocVw,
+   ACBrUtil.FilesIO,  ACBrUtil.XMLHTML, //VCL.StdCtrls,
+   ACBrDFeSSL, blcksock,System.Generics.Collections, Rest.json,
+   System.IniFiles, System.Classes, System.TypInfo, ACBrMail, WebModuleUnit1, JsonUtils;
+
 type
    TBkpEmiteNfe = class
       private
     function AlimentarNFe(req:TJSONObject) : string;
     function AlimentarNFCe(req: TJSONObject) : string;
+    function EnviaNFe: string;
+    var ACBrNFe : TACBrNFe ;
+    var ACBRMail : TACBrMail;
+    var profilePath : string;
    end;
 
 implementation
@@ -1454,6 +1465,58 @@ begin
   ACBrNFe.NotasFiscais.GerarNFe;
   result := EnviaNfe;
 end;
+
+function TBkpEmiteNfe.EnviaNFe() : string;
+var pathSave, xml: string;
+begin
+    pathSave := profilePath + '\xmls\enviados\' + ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID +'.xml';
+    if not FileExists(pathSave) then begin
+
+       ACBrNFe.NotasFiscais.Assinar;
+       ACBrNFe.NotasFiscais.Validar;
+
+
+       ACBrNFe.Enviar(1, False, True);
+
+       ACbrNFe.NotasFiscais.GravarXML(pathSave);
+       xml := loadFile(pathSave);
+
+       if ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cStat <> 100 then begin
+          raise Exception.Create( IntToStr(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cStat) +
+          ' - ' + ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMsg);
+       end;
+
+       var objResult := TJSONObject.Create;
+        try
+           objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
+           objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.tpAmb));
+           objResult.AddPair('verAplic',ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.verAplic);
+           objResult.AddPair('cStat',IntToStr(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cStat));
+           objResult.AddPair('xMotivo',ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMotivo);
+           objResult.AddPair('cMsg',IntToStr(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cMsg));
+           objResult.AddPair('xMsg',ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMsg);
+           objResult.AddPair('Protocolo',ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.nProt);
+           objResult.AddPair('profile',globalConfig.profile);
+           objResult.AddPair('xml',xml);
+           Result := objResult.ToString;
+        finally
+           objResult.Free;
+        end;
+    end else begin
+        xml := loadFile(pathSave);
+        var objResult := TJSONObject.Create;
+        try
+           objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
+           objResult.AddPair('profile',globalConfig.profile);
+           objResult.AddPair('xml',xml);
+           Result := objResult.ToString;
+        finally
+           objResult.Free;
+        end;
+    end;
+end;
+
+
 
 
 end.
