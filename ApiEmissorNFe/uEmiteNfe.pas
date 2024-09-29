@@ -17,7 +17,7 @@ type
       function GerarNfe(dataReq:TJSONObject) : string;
       function GerarNFCe(dataReq:TJSONObject) : string;
       function EventoCancelamento(req: TJSONObject): string;
-      function StatusServico: string;
+      function StatusServico(certSenha, UF:string): string;
       function ConsultaNF(chave: string) : string;
       function EventoCartaCorrecao(req: TJSONObject): string;
       function InutilizaNumeracao(req: TJSONObject): string;
@@ -61,13 +61,22 @@ end;
 
 procedure TEmiteNfe.ConfiguraAmbiente(profile:string);
 begin
-   profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + profile + '\';
+   {$IFDEF LINUX}
+      profilePath := '/usr/local/modFiscalData' + '/profiles/' + profile + '/';
+   {$ELSE}
+      profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + profile + '/';
+   {$ENDIF}
+
    if (not DirectoryExists(profilePath)) or (profile = '') then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
    LerConfiguracao(profilePath + 'config.ini');
 end;
 
-function TEmiteNfe.StatusServico: string;
+function TEmiteNfe.StatusServico(certSenha, UF:string): string;
 begin
+
+   ACBrNFe.Configuracoes.Certificados.Senha  := AnsiString(certSenha);
+   ACBRNfe.Configuracoes.WebServices.UF      := UF;
+
    ACBrNFe.WebServices.StatusServico.Executar;
 
    var objResult := TJSONObject.Create;
@@ -235,25 +244,25 @@ begin
    end;
 end;
 
+
 procedure TEmiteNfe.LerConfiguracao(pathConfig:string);
 var
   Ini: TIniFile;
   ok : boolean;
 begin
 
-Ini := TIniFile.Create(pathConfig);
-
+   Ini := TIniFile.Create(pathConfig);
    try
       ACBrNFe.SSL.SSLType                               :=  TSSLType.LT_TLSv1_2; //TSSLType(Ini.ReadInteger(  'WebService',  'SSLType',  5 ));
       ACBrNFe.Configuracoes.Certificados.URLPFX         := Ini.ReadString(            'Certificado', 'URL',        '');
-      ACBrNFe.Configuracoes.Certificados.ArquivoPFX     := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + GlobalConfig.profile  + '\' + Ini.ReadString( 'Certificado', 'NomeArqCert', '');
+      ACBrNFe.Configuracoes.Certificados.ArquivoPFX     := profilePath + Ini.ReadString( 'Certificado', 'NomeArqCert', '');
      // ACBrNFe.Configuracoes.Certificados.NumeroSerie    := Ini.ReadString(            'Certificado', 'NumSerie',   '');
 
       with ACBrNFe.Configuracoes.Geral do begin
-         SSLLib                := TSSLLib( Ini.ReadInteger(         'Certificado', 'SSLLib',           0));
-         SSLCryptLib           := TSSLCryptLib(Ini.ReadInteger(     'Certificado', 'CryptLib',         0));
-         SSLHttpLib            := TSSLHttpLib(Ini.ReadInteger(      'Certificado', 'HttpLib',          0));
-         SSLXmlSignLib         := TSSLXmlSignLib(Ini.ReadInteger(   'Certificado', 'XmlSignLib',       0));
+         SSLLib                := TSSLLib( Ini.ReadInteger(         'Certificado', 'SSLLib',           1));
+         SSLCryptLib           := TSSLCryptLib(Ini.ReadInteger(     'Certificado', 'CryptLib',         1));
+         SSLHttpLib            := TSSLHttpLib(Ini.ReadInteger(      'Certificado', 'HttpLib',          3));
+         SSLXmlSignLib         := TSSLXmlSignLib(Ini.ReadInteger(   'Certificado', 'XmlSignLib',       4));
          AtualizarXMLCancelado := Ini.ReadBool(                     'Geral',       'AtualizarXML',     True);
          ExibirErroSchema      := Ini.ReadBool(                     'Geral',       'ExibirErroSchema', True);
          FormatoAlerta         := Ini.ReadString(                   'Geral',       'FormatoAlerta',    'TAG:%TAGNIVEL% ID:%ID%/%TAG%(%DESCRICAO%) - %MSG%.');
@@ -284,8 +293,13 @@ Ini := TIniFile.Create(pathConfig);
       end;
 
       with ACBrNFe.Configuracoes.Arquivos do begin
-         PathSchemas      := Ini.ReadString(  'Arquivos', 'PathSchemas',      PathWithDelim(ExtractFilePath(ParamStr(0)))+'Schemas\'+GetEnumName(TypeInfo(TpcnVersaoDF), integer(ACBrNFe.Configuracoes.Geral.VersaoDF) ));
-         PathSalvar       := Ini.ReadString(  'Arquivos', 'PathSalvar',       PathWithDelim(ExtractFilePath(ParamStr(0)))+'Logs');
+         {$IFDEF LINUX}
+            PathSchemas      := Ini.ReadString(  'Arquivos', 'PathSchemas',  '/usr/local/modFiscalData/Schemas/'+GetEnumName(TypeInfo(TpcnVersaoDF), integer(ACBrNFe.Configuracoes.Geral.VersaoDF) ));
+            PathSalvar       := Ini.ReadString(  'Arquivos', 'PathSalvar',   '/usr/local/modFiscalData/Schemas/Logs');
+         {$ELSE}
+            PathSchemas      := Ini.ReadString(  'Arquivos', 'PathSchemas',  PathWithDelim(ExtractFilePath(ParamStr(0))) +'Schemas\'+GetEnumName(TypeInfo(TpcnVersaoDF), integer(ACBrNFe.Configuracoes.Geral.VersaoDF) ));
+            PathSalvar       := Ini.ReadString(  'Arquivos', 'PathSalvar',   PathWithDelim(ExtractFilePath(ParamStr(0))) +'Logs');
+         {$ENDIF}
          Salvar           := Ini.ReadBool(    'Arquivos', 'Salvar',           false);
          SepararPorMes    := Ini.ReadBool(    'Arquivos', 'PastaMensal',      false);
          AdicionarLiteral := Ini.ReadBool(    'Arquivos', 'AddLiteral',       false);
@@ -658,7 +672,9 @@ begin
       InfoPgto.tPag   := StrToFormaPagamento(Ok,reqPagamento.forma);
       if not ok then raise Exception.Create('forma pagamento incorreto!');
       InfoPgto.vPag   := reqPagamento.valor;
-      InfoPgto.tpIntegra := TtpIntegra.tiPagNaoIntegrado;
+      if (InfoPgto.tPag = TpcnFormaPagamento.fpCartaoCredito) or
+      (InfoPgto.tPag = TpcnFormaPagamento.fpCartaoDebito) then
+         InfoPgto.tpIntegra := TtpIntegra.tiPagNaoIntegrado;
    end;
 
    // TOTALIZAÇÃO

@@ -9,26 +9,24 @@ uses
   DataSnap.DSAuth,
   Datasnap.DSProxyJavaScript, IPPeerServer, Datasnap.DSMetadata,
   Datasnap.DSServerMetadata, Datasnap.DSClientMetadata, Datasnap.DSCommonServer,
-  Datasnap.DSHTTP;
+  Datasnap.DSHTTP, uConfig;
 
 type
   TWebModule1 = class(TWebModule)
     DSHTTPWebDispatcher1: TDSHTTPWebDispatcher;
     DSServer1: TDSServer;
-    DSAuthenticationManager1: TDSAuthenticationManager;
+    DSServerClass1: TDSServerClass;
     ServerFunctionInvoker: TPageProducer;
     ReverseString: TPageProducer;
     WebFileDispatcher1: TWebFileDispatcher;
     DSProxyGenerator1: TDSProxyGenerator;
     DSServerMetaDataProvider1: TDSServerMetaDataProvider;
     classNfe: TDSServerClass;
+    DSAuthenticationManager: TDSAuthenticationManager;
+    procedure DSServerClass1GetClass(DSServerClass: TDSServerClass;
+      var PersistentClass: TPersistentClass);
     procedure classNfeGetClass(DSServerClass: TDSServerClass;
       var PersistentClass: TPersistentClass);
-    procedure DSAuthenticationManager1UserAuthorize(Sender: TObject;
-      EventObject: TDSAuthorizeEventObject; var valid: Boolean);
-    procedure DSAuthenticationManager1UserAuthenticate(Sender: TObject;
-      const Protocol, Context, User, Password: string; var valid: Boolean;
-      UserRoles: TStrings);
     procedure ServerFunctionInvokerHTMLTag(Sender: TObject; Tag: TTag;
       const TagString: string; TagParams: TStrings; var ReplaceText: string);
     procedure WebModuleDefaultAction(Sender: TObject;
@@ -38,17 +36,23 @@ type
     procedure WebFileDispatcher1BeforeDispatch(Sender: TObject;
       const AFileName: string; Request: TWebRequest; Response: TWebResponse;
       var Handled: Boolean);
+    procedure DSAuthenticationManagerUserAuthenticate(Sender: TObject;
+      const Protocol, Context, User, Password: string; var valid: Boolean;
+      UserRoles: TStrings);
     procedure WebModuleCreate(Sender: TObject);
   private
     { Private declarations }
     FServerFunctionInvokerAction: TWebActionItem;
     function AllowServerFunctionInvoker: Boolean;
+
   public
     { Public declarations }
   end;
 
 var
   WebModuleClass: TComponentClass = TWebModule1;
+  var GlobalConfig : TConfig;
+
 
 implementation
 
@@ -56,7 +60,13 @@ implementation
 
 {$R *.dfm}
 
-uses  Web.WebReq, smNfe;
+uses ServerMethodsUnit1, Web.WebReq, smNfe, ServerConst1, uAuthJWT;
+
+procedure TWebModule1.DSServerClass1GetClass(
+  DSServerClass: TDSServerClass; var PersistentClass: TPersistentClass);
+begin
+  PersistentClass := ServerMethodsUnit1.TServerMethods1;
+end;
 
 procedure TWebModule1.classNfeGetClass(
   DSServerClass: TDSServerClass; var PersistentClass: TPersistentClass);
@@ -64,18 +74,11 @@ begin
   PersistentClass := smNfe.TNfeController;
 end;
 
-procedure TWebModule1.DSAuthenticationManager1UserAuthenticate(
-  Sender: TObject; const Protocol, Context, User, Password: string;
-  var valid: Boolean; UserRoles: TStrings);
+procedure TWebModule1.DSAuthenticationManagerUserAuthenticate(Sender: TObject;
+  const Protocol, Context, User, Password: string; var valid: Boolean;
+  UserRoles: TStrings );
 begin
-  valid := True;
-end;
-
-procedure TWebModule1.DSAuthenticationManager1UserAuthorize(
-  Sender: TObject; EventObject: TDSAuthorizeEventObject; 
-  var valid: Boolean);
-begin
-  valid := True;
+   Valid := GlobalConfig.isTokenValid;
 end;
 
 procedure TWebModule1.ServerFunctionInvokerHTMLTag(Sender: TObject; Tag: TTag;
@@ -90,10 +93,7 @@ begin
   else if SameText(TagString, 'classname') then
     ReplaceText := smNfe.TNfeController.ClassName
   else if SameText(TagString, 'loginrequired') then
-    if DSHTTPWebDispatcher1.AuthenticationManager <> nil then
       ReplaceText := 'true'
-    else
-      ReplaceText := 'false'
   else if SameText(TagString, 'serverfunctionsjs') then
     ReplaceText := string(Request.InternalScriptName) + '/js/serverfunctions.js'
   else if SameText(TagString, 'servertime') then
@@ -118,9 +118,27 @@ end;
 
 procedure TWebModule1.WebModuleBeforeDispatch(Sender: TObject;
   Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var AuthHeader, Token : string;
 begin
+  if not GlobalConfig.isBearer then GlobalConfig.isTokenValid := False;
+  if Request.PathInfo = '/datasnap/rest/TNfeController/CreateToken' then
+     GlobalConfig.isTokenValid := True
+  else begin
+      AuthHeader := Request.GetFieldByName('Authorization');
+      if AuthHeader <> EmptyStr then begin
+         Token := AuthHeader.Substring(7);
+         var auth := TAuthJWT.Create;
+         GlobalConfig.isTokenValid := auth.isTokenValid(Token)
+      end;
+  end;
   if FServerFunctionInvokerAction <> nil then
     FServerFunctionInvokerAction.Enabled := AllowServerFunctionInvoker;
+
+  if not GlobalConfig.isTokenValid then begin
+    Response.StatusCode := 401;
+    Response.Content := 'Unauthorized: Token incorreto ou não informado';
+    Handled := True;
+  end;
 end;
 
 function TWebModule1.AllowServerFunctionInvoker: Boolean;
@@ -151,8 +169,11 @@ begin
 end;
 
 initialization
+   Globalconfig := TConfig.Create;
+
 finalization
   Web.WebReq.FreeWebModules;
+
 
 end.
 

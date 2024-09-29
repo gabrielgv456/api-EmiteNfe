@@ -53,9 +53,15 @@ var
     res, base64, profilePath, saveFile : string;
     ok : Boolean;
 begin
+
    base64 := value.GetValue<String>('base64Cert','') ;
    if (base64 = '') then raise Exception.Create('Informe o base64Cert!');
-      profilePath := PathWithDelim(ExtractFilePath(ParamStr(0))) + '\profiles\' + GlobalConfig.profile  + '\';
+   {$IFDEF LINUX}
+      profilePath := '/usr/local/modFiscalData' + '/profiles/' + GlobalConfig.profile  + '/';
+   {$ELSE}
+      profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + GlobalConfig.profile  + '\';
+   {$ENDIF}
+
    if (not DirectoryExists(profilePath)) or (GlobalConfig.profile = '') then
       raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
    if FileExists(profilePath + 'cert.pfx') then DeleteFile(profilePath + 'cert.pfx');
@@ -114,11 +120,27 @@ end;
 function TNfeController.statusServico: string;
 var
     emiteNFE  : TEmiteNfe;
-    res : string;
+    res, certSenha, UF : string;
+    params: TDSInvocationMetadata;
+    ok: Boolean;
 begin
+   params := GetInvocationMetadata;
+   for var i := 0 to params.QueryParams.Count -1 do begin
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'certificadoSenha' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "certificadoSenha"');
+          certSenha :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'UF' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "UF"');
+          UF :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
+   end;
+   if (certSenha = EmptyStr) then raise Exception.Create('Informe o param certificadoSenha');
+   if (UF = EmptyStr) then raise Exception.Create('Informe o param UF');
+
    emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
-      res := emiteNFE.StatusServico;
+      res := emiteNFE.StatusServico(certSenha,UF);
       Result := res;
       JSONResponse(200,res);
    finally

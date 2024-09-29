@@ -37,8 +37,8 @@
     <Transaction>2024/01/13 18:51:05.000.933,=D:\1 - Gabriel Gonçalves\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\Unit1.pas</Transaction>
     <Transaction>2024/09/05 08:51:19.000.972,=C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\Unit1.pas</Transaction>
     <Transaction>2024/09/05 08:56:48.000.033,C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\Unit1.pas=C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\nfDTO.pas</Transaction>
-    <Transaction>2024/09/09 08:00:31.315,=C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\Unit1.pas</Transaction>
-    <Transaction>2024/09/09 08:00:48.180,C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\uBkpEmiteNfe.pas=C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\Unit1.pas</Transaction>
+    <Transaction>2024/09/09 08:00:31.000.315,=C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\Unit1.pas</Transaction>
+    <Transaction>2024/09/09 08:00:48.000.180,C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\uBkpEmiteNfe.pas=C:\Gabriel Goncalves Desenv\Delphi Gabriel\Api-Emissor-NFE\ApiEmissorNFe\Unit1.pas</Transaction>
   </Transactions>
 	<ProjectSortOrder AutoSort="0" SortType="0">
     <File Path="css"/>

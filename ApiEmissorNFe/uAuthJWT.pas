@@ -57,19 +57,27 @@ begin
                claims := LToken.Claims.JSON;
                if (not containsProperty(claims,'user')) or (not containsProperty(claims,'key')) then begin
                   Result := False;
+                  raise Exception.Create('nao contem user ou chave');
                   Exit;
                end;
                user := claims.GetValue<string>('user');
                key  := claims.GetValue<string>('key');
                if (user = EmptyStr) or (key = EmptyStr) then begin
+                  raise Exception.Create('vazio');
                   Result := False;
                   Exit;
                end;
                GlobalConfig.profile := key + '_' + user;
                GlobalConfig.cnpj := user;
-               profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + GlobalConfig.profile + '\';
+               {$IFDEF LINUX}
+                  profilePath := '/usr/local/modFiscalData' + '/profiles/' + GlobalConfig.profile + '/';
+               {$ELSE}
+                  profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + GlobalConfig.profile + '\';
+               {$ENDIF}
+
                if (not DirectoryExists(profilePath)) then begin
                   Result := False;
+                  raise Exception.Create('path nao exite');
                   Exit;
                end;
             end;
@@ -86,7 +94,12 @@ function TAuthJWT.createToken(key,cnpj:string):string;
 var
   LResult,profilePath: string;
 begin
-   profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + key + '_' + cnpj + '\';
+   {$IFDEF LINUX}
+      profilePath := '/usr/local/modFiscalData' + '/profiles/' + key + '_' + cnpj + '/';
+   {$ELSE}
+      profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + key + '_' + cnpj + '\';
+   {$ENDIF}
+
    if (not DirectoryExists(profilePath)) or (key = '') or (cnpj = '') then
       raise Exception.Create('Chave e/ou CNPJ incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
 
