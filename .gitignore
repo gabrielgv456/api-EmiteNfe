@@ -1,2 +1,43 @@
-.dcu
-.o
+# Delphi compiled units
+*.dcu
+*.o
+*.obj
+*.bpl
+*.dcp
+*.so
+*.dll
+*.exe
+
+# Delphi generated files
+*.identcache
+*.dproj.local
+*.dres
+*.res
+*.stat
+*.cfg
+*.dsk
+*.local
+
+# Delphi history folder
+__history/
+
+# Build output directories
+Win32/
+Win64/
+Linux64/
+
+# Logs
+Logs/
+
+# Profiles and settings (runtime data)
+profiles/
+settings/
+
+# Resource files (auto-generated)
+*.map
+*.pdb
+
+# Temporary files
+*.~*
+*.bak
+*.tmp

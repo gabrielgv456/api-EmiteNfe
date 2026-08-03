@@ -38,9 +38,11 @@ function TNfeController.updateCreateToken(Value:TJSONObject) : string;
 var
    authJWT : TAuthJWT;
 begin
-   validateAllProperties(Value,['user','key']);
+   validateAllProperties(Value,['user','key','token']);
    authJWT := TAuthJWT.Create;
    try
+      if Value.GetValue<String>('token') <> '019257ab-51ee-7c14-a45a-a64a77788832' then
+         raise Exception.Create('Token para criar autenticação na Api Fiscal incorreto!');
       result  := authJWT.createToken(Value.GetValue<String>('key'),Value.GetValue<String>('user'));
       JSONResponse(200,result);
    finally
@@ -56,14 +58,16 @@ begin
 
    base64 := value.GetValue<String>('base64Cert','') ;
    if (base64 = '') then raise Exception.Create('Informe o base64Cert!');
+
    {$IFDEF LINUX}
       profilePath := '/usr/local/modFiscalData' + '/profiles/' + GlobalConfig.profile  + '/';
    {$ELSE}
       profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + GlobalConfig.profile  + '\';
    {$ENDIF}
 
-   if (not DirectoryExists(profilePath)) or (GlobalConfig.profile = '') then
+   if (GlobalConfig.profile = EmptyStr) or (not DirectoryExists(profilePath)) then
       raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
+
    if FileExists(profilePath + 'cert.pfx') then DeleteFile(profilePath + 'cert.pfx');
 
    saveFile := JsonUtils.Base64SaveFile(ok, base64, profilePath + 'cert.pfx');

@@ -94,14 +94,19 @@ function TAuthJWT.createToken(key,cnpj:string):string;
 var
   LResult,profilePath: string;
 begin
+   if (key = '') or (cnpj = '') then
+      raise Exception.Create('Chave e/ou CNPJ incorreto ou não informado' );
+
    {$IFDEF LINUX}
       profilePath := '/usr/local/modFiscalData' + '/profiles/' + key + '_' + cnpj + '/';
    {$ELSE}
       profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + key + '_' + cnpj + '\';
    {$ENDIF}
 
-   if (not DirectoryExists(profilePath)) or (key = '') or (cnpj = '') then
-      raise Exception.Create('Chave e/ou CNPJ incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
+   if not DirectoryExists(profilePath) then
+   begin
+      if not ForceDirectories(profilePath) then raise Exception.Create('Falha ao criar o diretório: ' + profilePath);
+   end;
 
   LResult := TJOSEProcess.New
     .SetAlgorithm(TJOSEAlgorithmId.HS256)

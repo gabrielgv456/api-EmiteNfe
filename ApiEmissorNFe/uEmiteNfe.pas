@@ -60,15 +60,21 @@ begin
 end;
 
 procedure TEmiteNfe.ConfiguraAmbiente(profile:string);
+var
+   pathConfig: String;
 begin
    {$IFDEF LINUX}
       profilePath := '/usr/local/modFiscalData' + '/profiles/' + profile + '/';
+      pathConfig  := '/usr/local/modFiscalData/settings/config.ini';
    {$ELSE}
-      profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + profile + '/';
+      profilePath := ExtractFilePath(ParamStr(0)) + '\profiles\' + profile + '\';
+      pathConfig  := ExtractFilePath(ParamStr(0)) + '\settings\config.ini';
    {$ENDIF}
 
    if (not DirectoryExists(profilePath)) or (profile = '') then raise Exception.Create('Profile incorreto ou não configurado. Entre em contato conosco para obter sua identificação!' );
-   LerConfiguracao(profilePath + 'config.ini');
+   if (not FileExists(pathConfig)) then raise Exception.Create('Arquivo de configurações fiscais não encontrado');
+
+   LerConfiguracao(pathConfig);
 end;
 
 function TEmiteNfe.StatusServico(certSenha, UF:string): string;
@@ -337,7 +343,15 @@ end;
 function TEmiteNFe.EnviaNFe() : string;
 var pathSave, xml: string;
 begin
-    pathSave := profilePath + '\xmls\enviados\' + ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID +'.xml';
+    pathSave := profilePath + '\xmls\enviados\';
+
+    if not DirectoryExists(pathSave) then
+    begin
+       if not ForceDirectories(pathSave) then raise Exception.Create('Falha ao criar o diretório: ' + pathSave);
+    end;
+
+    pathSave := pathSave + ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID +'.xml';
+
     if not FileExists(pathSave) then begin
 
        ACBrNFe.NotasFiscais.Assinar;
