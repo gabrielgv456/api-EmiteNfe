@@ -343,6 +343,16 @@ end;
 function TEmiteNFe.EnviaNFe() : string;
 var pathSave, xml: string;
 begin
+    pathSave := profilePath + 'xmls/registros/';
+
+    if not DirectoryExists(pathSave) then
+    begin
+       if not ForceDirectories(pathSave) then raise Exception.Create('Falha ao criar o diretório: ' + pathSave);
+    end;
+
+    pathSave := pathSave + ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID +'.xml';
+    ACbrNFe.NotasFiscais.GravarXML(pathSave);
+
     pathSave := profilePath + 'xmls/enviados/';
 
     if not DirectoryExists(pathSave) then
