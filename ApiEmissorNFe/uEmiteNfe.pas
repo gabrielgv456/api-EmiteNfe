@@ -3,7 +3,7 @@ unit uEmiteNfe;
 interface
 
 uses
-   ACBRNfe, ACBrNFeNotasFiscais, pcnNFe, pcnConversao, JSON, pcnConversaoNFE,
+   ACBRNfe, ACBrNFeNotasFiscais, ACBrNFe.Classes, pcnConversao, JSON, pcnConversaoNFE,
    System.SysUtils, System.StrUtils, ACBrDFeUtil, //SHDocVw,
    ACBrUtil.FilesIO,  ACBrUtil.XMLHTML, //VCL.StdCtrls,
    ACBrDFeSSL, blcksock,System.Generics.Collections, Rest.json,
