@@ -415,6 +415,7 @@ type
     FTotal: TTotalDTO;
     FobsComplementar: TArray<TObsDTO>;
     FobsFisco: TArray<TObsDTO>;
+    FIndIntermediador: string;
   public
     property CertificadoSenha: string read FCertificadoSenha write FCertificadoSenha;
     property CodCSC: string read FCodCSC write FCodCSC;
@@ -439,6 +440,7 @@ type
     property Total: TTotalDTO read FTotal write FTotal;
     property obsComplementar: TArray<TObsDTO> read FobsComplementar write FobsComplementar;
     property obsFisco: TArray<TObsDTO> read FobsFisco write FobsFisco;
+    property IndIntermediador: string read FIndIntermediador write FIndIntermediador;
   end;
 
 

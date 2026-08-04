@@ -452,13 +452,35 @@ begin
    if not ok then raise Exception.Create('indFinal incorreto');
    NotaF.NFe.Ide.finNFe    := StrToFinNFe(ok,reqNF.finalidadeNFe);
    if not ok then raise Exception.Create('finalidadeNFe incorreto');
+
    if NotaF.NFe.Ide.modelo = 65 then begin
-      NotaF.NFe.Ide.tpImp := tiNFCe;
-      NotaF.NFe.Ide.indPres := StrToPresencaComprador(ok,reqNF.indPresenca);
-      if not ok then raise Exception.Create('indPresenca incorreto !');
+     NotaF.NFe.Ide.tpImp := tiNFCe;
    end else begin
-      if Assigned( ACBrNFe.DANFE ) then NotaF.NFe.Ide.tpImp := ACBrNFe.DANFE.TipoDANFE;
+     // NF-e 55: DANFE retrato (igual nota base)
+     if Assigned(ACBrNFe.DANFE) then
+       NotaF.NFe.Ide.tpImp := ACBrNFe.DANFE.TipoDANFE
+     else
+       NotaF.NFe.Ide.tpImp := tiRetrato;
    end;
+
+   NotaF.NFe.Ide.indPres := StrToPresencaComprador(ok, reqNF.IndPresenca);
+   if not ok then raise Exception.Create('indPresenca incorreto !');
+
+   // NT 2020.006: obrigatório quando indPres in 1,2,3,4,5,9
+   if Trim(reqNF.IndIntermediador) <> '' then begin
+     NotaF.NFe.Ide.indIntermed := StrToIndIntermed(ok, reqNF.IndIntermediador);
+     if not ok then raise Exception.Create('indIntermediador incorreto !');
+   end else if NotaF.NFe.Ide.indPres in [
+     pcInternet,
+     pcOutros,
+     pcTeleatendimento,
+     pcEntregaDomicilio,
+     pcPresencial,
+     pcPresencialForaEstabelecimento
+   ] then
+     NotaF.NFe.Ide.indIntermed := iiOperacaoSemIntermediador;
+
+
 
    // EMITENTE
    NotaF.NFe.Emit.CNPJCPF           := reqNF.Emitente.CNPJCPF;
@@ -690,17 +712,25 @@ begin
 
    // PAGAMENTO
    for var reqPagamento in reqNF.Pagamento do begin
-      InfoPgto := NotaF.NFe.pag.New;
-      InfoPgto.indPag := StrToIndpag(ok,reqPagamento.condicao);
-      if not ok then raise Exception.Create('condicao pagamento incorreto!');
-      InfoPgto.tPag   := StrToFormaPagamento(Ok,reqPagamento.forma);
-      if not ok then raise Exception.Create('forma pagamento incorreto!');
-      InfoPgto.vPag   := reqPagamento.valor;
-      if (InfoPgto.tPag = TpcnFormaPagamento.fpCartaoCredito) or
-      (InfoPgto.tPag = TpcnFormaPagamento.fpCartaoDebito) then
-         InfoPgto.tpIntegra := TtpIntegra.tiPagNaoIntegrado;
+     InfoPgto := NotaF.NFe.pag.New;
+
+     if Trim(reqPagamento.condicao) <> '' then begin
+       InfoPgto.indPag := StrToIndpag(ok, reqPagamento.condicao);
+       if not ok then raise Exception.Create('condicao pagamento incorreto!');
+     end;
+
+     InfoPgto.tPag := StrToFormaPagamento(Ok, reqPagamento.forma);
+     if not ok then raise Exception.Create('forma pagamento incorreto!');
+
+     InfoPgto.vPag := reqPagamento.valor;
+
+     if (InfoPgto.tPag = TpcnFormaPagamento.fpCartaoCredito) or
+        (InfoPgto.tPag = TpcnFormaPagamento.fpCartaoDebito) then
+       InfoPgto.tpIntegra := TtpIntegra.tiPagNaoIntegrado;
    end;
 
+
+   NotaF.NFe.infRespTec.email    := 'goncalves@vylotech.com.br';
    // TOTALIZAÇÃO
    NotaF.NFe.Total.ICMSTot.vBC          := reqNF.Total.ICMS.vBC;
    NotaF.NFe.Total.ICMSTot.vICMS        := reqNF.Total.ICMS.vICMS;
