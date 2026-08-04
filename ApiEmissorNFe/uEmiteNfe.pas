@@ -343,7 +343,7 @@ end;
 function TEmiteNFe.EnviaNFe() : string;
 var pathSave, xml: string;
 begin
-    pathSave := profilePath + '\xmls\enviados\';
+    pathSave := profilePath + 'xmls/enviados/';
 
     if not DirectoryExists(pathSave) then
     begin
