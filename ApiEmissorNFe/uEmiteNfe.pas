@@ -170,9 +170,8 @@ end;
 function TEmiteNfe.EventoCancelamento(req: TJSONObject): string;
 var ok : Boolean;
 begin
-   validateAllProperties(req,['chave','idLote','CNPJCPF','protocolo','justificativa','ambiente','xml']);
+   validateAllProperties(req,['chave','idLote','CNPJCPF','protocolo','justificativa','ambiente']);
 
-   ACBrNFe.NotasFiscais.LoadFromString(req.GetValue<string>('xml'));
    ACBrNFe.Configuracoes.Certificados.Senha  := AnsiString(req.GetValue<string>('certificadoSenha'));
    ACBRNfe.Configuracoes.WebServices.UF      := req.GetValue<String>('cUF');
 
