@@ -818,14 +818,17 @@ begin
    NotaF.NFe.Total.ICMSTot.vTotTrib     := reqNF.Total.ICMS.vTotTrib;
 
    // Reforma
+   if Assigned(reqNF.Total.IBSCBSTot) then begin
+      NotaF.NFe.Total.IBSCBSTot.vBCIBSCBS := reqNF.Total.IBSCBSTot.vBCIBSCBS;
+      NotaF.NFe.Total.IBSCBSTot.gIBS.gIBSUFTot.vIBSUF := reqNF.Total.IBSCBSTot.vIBSUF;
+      NotaF.NFe.Total.IBSCBSTot.gIBS.gIBSMunTot.vIBSMun := reqNF.Total.IBSCBSTot.vIBSMun;
+      NotaF.NFe.Total.IBSCBSTot.gIBS.vIBS := reqNF.Total.IBSCBSTot.vIBS;
+      NotaF.NFe.Total.IBSCBSTot.gCBS.vCBS := reqNF.Total.IBSCBSTot.vCBS;
+   end;
 
-   NotaF.NFe.Total.IBSCBSTot.vBCIBSCBS := reqNF.Total.IBSCBSTot.vBCIBSCBS;
-   NotaF.NFe.Total.IBSCBSTot.gIBS.gIBSUFTot.vIBSUF := reqNF.Total.IBSCBSTot.vIBSUF;
-   NotaF.NFe.Total.IBSCBSTot.gIBS.gIBSMunTot.vIBSMun := reqNF.Total.IBSCBSTot.vIBSMun;
-   NotaF.NFe.Total.IBSCBSTot.gIBS.vIBS := reqNF.Total.IBSCBSTot.vIBS;
-   NotaF.NFe.Total.IBSCBSTot.gCBS.vCBS := reqNF.Total.IBSCBSTot.vCBS;
-
-   NotaF.NFe.Total.ISTot.vIS := reqNF.Total.ISTot.vIS;
+   if Assigned(reqNF.Total.ISTot) then begin
+      NotaF.NFe.Total.ISTot.vIS := reqNF.Total.ISTot.vIS;
+   end;
 
    // Informações Adicionais
    NotaF.NFe.InfAdic.infCpl     :=  reqNF.InfAdicional.infComplementar;
