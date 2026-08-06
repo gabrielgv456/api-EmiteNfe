@@ -124,7 +124,7 @@ end;
 function TNfeController.statusServico: string;
 var
     emiteNFE  : TEmiteNfe;
-    res, certSenha, UF : string;
+    res, certSenha, UF, Ambiente : string;
     params: TDSInvocationMetadata;
     ok: Boolean;
 begin
@@ -138,13 +138,18 @@ begin
           if not ok then raise Exception.Create('Informe corretamente o parametro "UF"');
           UF :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
        end;
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'ambiente' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "ambiente"');
+          Ambiente :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
    end;
    if (certSenha = EmptyStr) then raise Exception.Create('Informe o param certificadoSenha');
    if (UF = EmptyStr) then raise Exception.Create('Informe o param UF');
+   if (Ambiente = EmptyStr) then raise Exception.Create('Informe o ambiente');
 
    emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
-      res := emiteNFE.StatusServico(certSenha,UF);
+      res := emiteNFE.StatusServico(certSenha, UF, Ambiente);
       Result := res;
       JSONResponse(200,res);
    finally
@@ -155,7 +160,7 @@ end;
 function TNfeController.consultaNF: string;
 var
     emiteNFE  : TEmiteNfe;
-    res , chave: string;
+    res , chave, ambiente: string;
     params: TDSInvocationMetadata;
     i : integer;
     ok:boolean;
@@ -166,11 +171,15 @@ begin
           if not ok then raise Exception.Create('Informe corretamente o parametro "chave"');
           chave :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
        end;
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'ambiente' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "ambiente"');
+          ambiente :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
    end;
    if chave = EmptyStr then raise Exception.Create('Informe corretamente o parametro "chave"');
    emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
-      res := emiteNFE.ConsultaNF(chave);
+      res := emiteNFE.ConsultaNF(chave, ambiente);
       Result := res;
       JSONResponse(200,res);
    finally

@@ -17,8 +17,8 @@ type
       function GerarNfe(dataReq:TJSONObject) : string;
       function GerarNFCe(dataReq:TJSONObject) : string;
       function EventoCancelamento(req: TJSONObject): string;
-      function StatusServico(certSenha, UF:string): string;
-      function ConsultaNF(chave: string) : string;
+      function StatusServico(certSenha, UF, ambiente:string): string;
+      function ConsultaNF(chave: string;ambiente:string) : string;
       function EventoCartaCorrecao(req: TJSONObject): string;
       function InutilizaNumeracao(req: TJSONObject): string;
    private
@@ -77,11 +77,15 @@ begin
    LerConfiguracao(pathConfig);
 end;
 
-function TEmiteNfe.StatusServico(certSenha, UF:string): string;
+function TEmiteNfe.StatusServico(certSenha, UF, ambiente:string): string;
+var ok: Boolean;
 begin
 
    ACBrNFe.Configuracoes.Certificados.Senha  := AnsiString(certSenha);
    ACBRNfe.Configuracoes.WebServices.UF      := UF;
+
+   ACBRNfe.Configuracoes.WebServices.Ambiente := StrToTpAmb(ok,Ambiente);
+   if not ok then raise Exception.Create('Ambiente incorreto!');
 
    ACBrNFe.WebServices.StatusServico.Executar;
 
@@ -104,11 +108,14 @@ begin
    end;
 end;
 
-function TEmiteNfe.ConsultaNF(chave:string) : string;
+function TEmiteNfe.ConsultaNF(chave:string; ambiente:string) : string;
+var ok: boolean;
 begin
    ACBrNFe.NotasFiscais.Clear;
    ACBrNFe.WebServices.Consulta.NFeChave := chave;
    ACBrNFe.WebServices.Consulta.Executar;
+   ACBRNfe.Configuracoes.WebServices.Ambiente := StrToTpAmb(ok,ambiente);
+   if not ok then raise Exception.Create('Ambiente incorreto!');
 
    var objResult := TJSONObject.Create;
    try
@@ -146,6 +153,9 @@ begin
       infEvento.detEvento.xCorrecao := req.GetValue<String>('correcao');
       InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
       if not ok then raise Exception.Create('Ambiente incorreto!');
+
+      ACBRNfe.Configuracoes.WebServices.Ambiente := InfEvento.tpAmb;
+
    end;
 
    ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
@@ -187,6 +197,7 @@ begin
       infEvento.detEvento.nProt := req.GetValue<String>('protocolo');
       InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
       if not ok then raise Exception.Create('Tipo de ambiente incorreto!');
+      ACBRNfe.Configuracoes.WebServices.Ambiente := InfEvento.tpAmb;
    end;
 
    ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
@@ -221,6 +232,8 @@ begin
 
    ACBrNFe.EventoNFe.Evento.Clear;
    ACBrNFe.Configuracoes.WebServices.Ambiente := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
+   if not ok then raise Exception.Create('Ambiente incorreto!');
+
    ACBrNFe.WebServices.Inutiliza(req.GetValue<string>('cnpjEmit'), req.GetValue<string>('justificativa'),
       req.GetValue<Integer>('ano'), req.GetValue<Integer>('modelo'), req.GetValue<Integer>('serie'),
       req.GetValue<Integer>('numeroInicial'), req.GetValue<Integer>('numeroFinal'));
@@ -282,8 +295,6 @@ begin
 
       with ACBrNFe.Configuracoes.WebServices do begin
 
-         Ambiente                 := StrToTpAmb(ok, Ini.Readstring(  'WebService', 'Ambiente',   '2'));  //['1', '2'], [taProducao, taHomologacao]);
-         if not ok then raise Exception.Create('Falha ao ler o ambiente');
          Visualizar               := Ini.ReadBool(                   'WebService', 'Visualizar', False);
          Salvar                   := Ini.ReadBool(                   'WebService', 'SalvarSOAP', False);
          AjustaAguardaConsultaRet := Ini.ReadBool(                   'WebService', 'AjustarAut', False);
@@ -445,8 +456,11 @@ begin
    if not ok then raise Exception.Create('tpNF incorreto');
    NotaF.NFe.Ide.tpEmis    := StrToTpEmis(ok, reqNF.tpEmis);
    if not ok then raise Exception.Create('tpEmis incorreto');
+
    NotaF.NFe.Ide.tpAmb     := StrToTpAmb(ok, reqNF.ambiente);
+   ACBRNfe.Configuracoes.WebServices.Ambiente := NotaF.NFe.Ide.tpAmb;
    if not ok then raise Exception.Create('ambiente incorreto');
+
    NotaF.NFe.Ide.indFinal  := StrToConsumidorFinal(ok,reqNF.indFinal);
    if not ok then raise Exception.Create('indFinal incorreto');
    NotaF.NFe.Ide.finNFe    := StrToFinNFe(ok,reqNF.finalidadeNFe);
