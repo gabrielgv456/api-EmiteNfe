@@ -2,7 +2,7 @@ unit nfDTO;
 
 interface
 
-uses Generics.Collections;
+uses Generics.Collections, REST.Json.Types;
 
 type
   TEnderecoDTO = class
@@ -238,6 +238,67 @@ type
     property vICMSUFRemet: Double read FvICMSUFRemet write FvICMSUFRemet;
   end;
 
+
+    // --- Reforma tributária (IBS/CBS/IS) — JSON: imposto.reforma ---
+
+   TISDTO = class
+   private
+     FCST: string;
+     FcClassTrib: string;
+     FpIS: Double;
+   public
+     property CST: string read FCST write FCST;
+     property cClassTrib: string read FcClassTrib write FcClassTrib;
+     property pIS: Double read FpIS write FpIS;
+   end;
+
+   TIBSCBSDTO = class
+   private
+     FCST: string;
+     FcClassTrib: string;
+     FvBC: Double;
+     FpCBS: Double;
+     FpDifCBS: Double;
+     FpRedCBS: Double;
+     FvCBS: Double;
+     FpIBSUF: Double;
+     FpDifIBSUF: Double;
+     FpRedIBSUF: Double;
+     FvIBSUF: Double;
+     FpIBSMun: Double;
+     FpDifIBSMun: Double;
+     FpRedIBSMun: Double;
+     FvIBSMun: Double;
+     FvIBS: Double;
+   public
+     property CST: string read FCST write FCST;
+     property cClassTrib: string read FcClassTrib write FcClassTrib;
+     property vBC: Double read FvBC write FvBC;
+     property pCBS: Double read FpCBS write FpCBS;
+     property pDifCBS: Double read FpDifCBS write FpDifCBS;
+     property pRedCBS: Double read FpRedCBS write FpRedCBS;
+     property vCBS: Double read FvCBS write FvCBS;
+     property pIBSUF: Double read FpIBSUF write FpIBSUF;
+     property pDifIBSUF: Double read FpDifIBSUF write FpDifIBSUF;
+     property pRedIBSUF: Double read FpRedIBSUF write FpRedIBSUF;
+     property vIBSUF: Double read FvIBSUF write FvIBSUF;
+     property pIBSMun: Double read FpIBSMun write FpIBSMun;
+     property pDifIBSMun: Double read FpDifIBSMun write FpDifIBSMun;
+     property pRedIBSMun: Double read FpRedIBSMun write FpRedIBSMun;
+     property vIBSMun: Double read FvIBSMun write FvIBSMun;
+     property vIBS: Double read FvIBS write FvIBS;
+   end;
+
+   TReformaDTO = class
+   private
+     FIS: TISDTO;
+     FIBSCBS: TIBSCBSDTO;
+   public
+     [JSONName('IS')]
+     property ImpostoSeletivo: TISDTO read FIS write FIS;
+     property IBSCBS: TIBSCBSDTO read FIBSCBS write FIBSCBS;
+   end;
+
   TImpostoDTO = class
   private
     FOrigemMercadoria: string;
@@ -247,6 +308,7 @@ type
     FIPI: TIPIDTO;
     FICMSUFDest: TICMSUFDestDTO;
     FvTotTrib: Double;
+    FReforma: TReformaDTO;
   public
     property OrigemMercadoria: string read FOrigemMercadoria write FOrigemMercadoria;
     property ICMS: TICMSDTO read FICMS write FICMS;
@@ -255,6 +317,7 @@ type
     property IPI: TIPIDTO read FIPI write FIPI;
     property ICMSUFDest: TICMSUFDestDTO read FICMSUFDest write FICMSUFDest;
     property vTotTrib: Double read FvTotTrib write FvTotTrib;
+    property reforma: TReformaDTO read FReforma write FReforma;
   end;
 
   TProdutoDTO = class
@@ -373,11 +436,37 @@ type
     property vTotTrib: Currency read FvTotTrib write FvTotTrib;
   end;
 
+  TIBSCBSTotDTO = class
+     private
+       FvBCIBSCBS: Currency;
+       FvIBSUF: Currency;
+       FvIBSMun: Currency;
+       FvIBS: Currency;
+       FvCBS: Currency;
+     public
+       property vBCIBSCBS: Currency read FvBCIBSCBS write FvBCIBSCBS;
+       property vIBSUF: Currency read FvIBSUF write FvIBSUF;
+       property vIBSMun: Currency read FvIBSMun write FvIBSMun;
+       property vIBS: Currency  read FvIBS write FvIBS;
+       property vCBS: Currency  read FvCBS write FvCBS;
+  end;
+
+  TISTotDTO = class
+     private
+       FvIS: Currency;
+     public
+       property vIS: Currency read FvIS write FvIS;
+  end;
+
   TTotalDTO = class
   private
     FICMS: TICMSTotalDTO;
+    FIBSCBSTot: TIBSCBSTotDTO;
+    FISTot: TISTotDTO;
   public
     property ICMS: TICMSTotalDTO read FICMS write FICMS;
+    property IBSCBSTot: TIBSCBSTotDTO read FIBSCBSTot write FIBSCBSTot;
+    property ISTot: TISTotDTO read FISTot write FISTot;
   end;
 
 
@@ -388,6 +477,13 @@ type
   public
     property campo: string read Fcampo write Fcampo;
     property texto: string read Ftexto write Ftexto;
+  end;
+
+  TAutXMLDTO = class
+  private
+     FCNPJCPF: string;
+  public
+     property CNPJCPF: string read FCNPJCPF write FCNPJCPF;
   end;
 
   TNotaFiscalDTO = class
@@ -416,6 +512,9 @@ type
     FobsComplementar: TArray<TObsDTO>;
     FobsFisco: TArray<TObsDTO>;
     FIndIntermediador: string;
+    FModFrete: string;
+    FCNPJCPF: string;
+    FAutXML: TArray<TAutXMLDTO>;
   public
     property CertificadoSenha: string read FCertificadoSenha write FCertificadoSenha;
     property CodCSC: string read FCodCSC write FCodCSC;
@@ -441,7 +540,10 @@ type
     property obsComplementar: TArray<TObsDTO> read FobsComplementar write FobsComplementar;
     property obsFisco: TArray<TObsDTO> read FobsFisco write FobsFisco;
     property IndIntermediador: string read FIndIntermediador write FIndIntermediador;
+    property modFrete: string read FModFrete write FModFrete;
+    property AutXml: TArray<TAutXMLDTO> read FAutXML write FAutXML;
   end;
+
 
 
 

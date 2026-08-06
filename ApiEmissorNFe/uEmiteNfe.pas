@@ -7,7 +7,7 @@ uses
    System.SysUtils, System.StrUtils, ACBrDFeUtil, //SHDocVw,
    ACBrUtil.FilesIO,  ACBrUtil.XMLHTML, //VCL.StdCtrls,
    ACBrDFeSSL, blcksock,System.Generics.Collections, Rest.json,
-   System.IniFiles, System.Classes, System.TypInfo, ACBrMail, WebModuleUnit1;
+   System.IniFiles, System.Classes, System.TypInfo, ACBrMail, WebModuleUnit1, ACBrDFe.Conversao, System.Math;
 
 type
    TEmiteNfe = class
@@ -535,6 +535,17 @@ begin
       if (NotaF.NFe.Ide.modelo = 55) then raise Exception.Create('Para nota fiscal modelo 55 é obrigatório informar o cliente!');
    end;
 
+   for var item in reqNF.AutXml do
+   begin
+      var doc := Trim(item.CNPJCPF);
+
+      if (Length(doc) <> 11) and (Length(doc) <> 14) then
+         raise Exception.Create('CNPJCPF inválido (use 11 ou 14 dígitos)');
+
+      with NotaF.NFe.autXML.New do CNPJCPF := doc;
+   end;
+      
+
    // ENTREGA
    if Assigned(reqNF.Entrega) then begin
       case AnsiIndexStr(UpperCase(reqNF.Entrega.Tipo),['RETIRADA','ENTREGA']) of
@@ -703,11 +714,62 @@ begin
                vCOFINS := reqProduto.imposto.COFINS.vCOFINS;
             end;
          end;
+
+         // REFORMA TRIBUTARIA
+         if Assigned(reqProduto.imposto.reforma) then
+         begin
+           // IS (Imposto Seletivo) — só quando o grupo tributário tiver is_cst
+           if Assigned(reqProduto.imposto.reforma.ImpostoSeletivo) then
+           begin
+             with Produto.Imposto.ISel do  // nome no ACBr — conferir
+             begin
+               CSTIS        := StrToCSTIS(reqProduto.imposto.reforma.ImpostoSeletivo.CST);
+               cClassTribIS := reqProduto.imposto.reforma.ImpostoSeletivo.cClassTrib;
+               pIS          := reqProduto.imposto.reforma.ImpostoSeletivo.pIS;
+               vBCIS        := reqProduto.ValorTotalProdutos;
+               vIS          := simpleRoundTo(vBCIS * pIS / 100, -2);
+             end;
+           end;
+
+           // IBS/CBS — obrigatório em homolog MG (CRT 3)
+           if Assigned(reqProduto.imposto.reforma.IBSCBS) then
+           begin
+             with Produto.Imposto.IBSCBS do
+             begin
+               CST := StrToCSTIBSCBS(reqProduto.imposto.reforma.IBSCBS.CST);
+
+               cClassTrib := reqProduto.imposto.reforma.IBSCBS.cClassTrib;
+
+               gIBSCBS.vBC := reqProduto.imposto.reforma.IBSCBS.vBC;
+               gIBSCBS.vIBS := reqProduto.imposto.reforma.IBSCBS.vIBS;
+
+               gIBSCBS.gIBSUF.pIBSUF := reqProduto.imposto.reforma.IBSCBS.pIBSUF;
+               gIBSCBS.gIBSUF.vIBSUF := reqProduto.imposto.reforma.IBSCBS.vIBSUF;
+               gIBSCBS.gIBSUF.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifIBSUF;
+               gIBSCBS.gIBSUF.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedIBSUF;
+
+               gIBSCBS.gIBSMun.pIBSMun := reqProduto.imposto.reforma.IBSCBS.pIBSMun;
+               gIBSCBS.gIBSMun.vIBSMun := reqProduto.imposto.reforma.IBSCBS.vIBSMun;
+               gIBSCBS.gIBSMun.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifIBSMun;
+               gIBSCBS.gIBSMun.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedIBSMun;
+
+               gIBSCBS.gCBS.pCBS := reqProduto.imposto.reforma.IBSCBS.pCBS;
+               gIBSCBS.gCBS.vCBS := reqProduto.imposto.reforma.IBSCBS.vCBS;
+               gIBSCBS.gCBS.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifCBS;
+               gIBSCBS.gCBS.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedCBS;
+             end;
+           end;
+         end;
+
       end;
    end;
 
    if NotaF.NFe.Ide.modelo = 65 then
-   NotaF.NFe.Transp.modFrete := mfSemFrete; // NFC-e não pode ter FRETE
+      NotaF.NFe.Transp.modFrete := mfSemFrete // NFC-e não pode ter FRETE
+   else begin
+      NotaF.NFe.Transp.modFrete := StrTomodFrete(Ok,reqNF.modFrete); //EnumeradoToStr(t, ['0', '1', '2', '3', '4', '9'], [mfContaEmitente, mfContaDestinatario, mfContaTerceiros, mfProprioRemetente, mfProprioDestinatario, mfSemFrete]);
+      if not ok then raise Exception.Create('modFrete incorreto!');
+   end;
 
    // PAGAMENTO
    for var reqPagamento in reqNF.Pagamento do begin
@@ -751,6 +813,16 @@ begin
    NotaF.NFe.Total.ICMSTot.vFCPST       := reqNF.Total.ICMS.vFCPST;
    NotaF.NFe.Total.ICMSTot.vFCPSTRet    := reqNF.Total.ICMS.vFCPSTRet;
    NotaF.NFe.Total.ICMSTot.vTotTrib     := reqNF.Total.ICMS.vTotTrib;
+
+   // Reforma
+
+   NotaF.NFe.Total.IBSCBSTot.vBCIBSCBS := reqNF.Total.IBSCBSTot.vBCIBSCBS;
+   NotaF.NFe.Total.IBSCBSTot.gIBS.gIBSUFTot.vIBSUF := reqNF.Total.IBSCBSTot.vIBSUF;
+   NotaF.NFe.Total.IBSCBSTot.gIBS.gIBSMunTot.vIBSMun := reqNF.Total.IBSCBSTot.vIBSMun;
+   NotaF.NFe.Total.IBSCBSTot.gIBS.vIBS := reqNF.Total.IBSCBSTot.vIBS;
+   NotaF.NFe.Total.IBSCBSTot.gCBS.vCBS := reqNF.Total.IBSCBSTot.vCBS;
+
+   NotaF.NFe.Total.ISTot.vIS := reqNF.Total.ISTot.vIS;
 
    // Informações Adicionais
    NotaF.NFe.InfAdic.infCpl     :=  reqNF.InfAdicional.infComplementar;
