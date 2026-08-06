@@ -113,9 +113,12 @@ var ok: boolean;
 begin
    ACBrNFe.NotasFiscais.Clear;
    ACBrNFe.WebServices.Consulta.NFeChave := chave;
-   ACBrNFe.WebServices.Consulta.Executar;
+
    ACBRNfe.Configuracoes.WebServices.Ambiente := StrToTpAmb(ok,ambiente);
    if not ok then raise Exception.Create('Ambiente incorreto!');
+
+   ACBrNFe.WebServices.Consulta.Executar;
+
 
    var objResult := TJSONObject.Create;
    try
