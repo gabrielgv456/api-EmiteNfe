@@ -309,6 +309,7 @@ type
     FICMSUFDest: TICMSUFDestDTO;
     FvTotTrib: Double;
     FReforma: TReformaDTO;
+    FcBenef: string;
   public
     property OrigemMercadoria: string read FOrigemMercadoria write FOrigemMercadoria;
     property ICMS: TICMSDTO read FICMS write FICMS;
@@ -318,6 +319,7 @@ type
     property ICMSUFDest: TICMSUFDestDTO read FICMSUFDest write FICMSUFDest;
     property vTotTrib: Double read FvTotTrib write FvTotTrib;
     property reforma: TReformaDTO read FReforma write FReforma;
+    property cBenef: string read FcBenef write FcBenef;
   end;
 
   TProdutoDTO = class

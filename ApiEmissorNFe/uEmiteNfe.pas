@@ -608,6 +608,9 @@ begin
       Produto.Prod.vSeg      := reqProduto.valorSeguro;
       Produto.Prod.vDesc     := reqProduto.valorDesconto;
 
+      if (Trim(reqProduto.imposto.cBenef) <> EmptyStr) then
+        Produto.Prod.cBenef := reqProduto.imposto.cBenef;
+
       // IMPOSTO DO PRODUTO
       with Produto.Imposto do
       begin
