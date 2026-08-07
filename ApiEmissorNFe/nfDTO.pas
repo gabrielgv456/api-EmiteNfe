@@ -322,6 +322,23 @@ type
     property cBenef: string read FcBenef write FcBenef;
   end;
 
+  TCombustivelDTO = class
+  private
+    FCodigoANP: string;
+    FDescricaoANP: string;
+    FpBio: Double;
+    FUFOrig: string;
+    FpOrig: Double;
+    FindImport: string;
+  public
+    property codigoANP: string read FCodigoANP write FCodigoANP;
+    property descricaoANP: string read FDescricaoANP write FDescricaoANP;
+    property pBio: Double read FpBio write FpBio;
+    property UFOrig: string read FUFOrig write FUFOrig;
+    property pOrig: Double read FpOrig write FpOrig;
+    property indImport: string read FindImport write FindImport;
+  end;
+
   TProdutoDTO = class
    private
     FDescricao: string;
@@ -347,6 +364,7 @@ type
     FValorFrete: Double;
     FValorOutro: Double;
     FImposto: TImpostoDTO;
+    FCombustivel: TCombustivelDTO;
   public
     property Descricao: string read FDescricao write FDescricao;
     property Codigo: string read FCodigo write FCodigo;
@@ -371,6 +389,7 @@ type
     property ValorFrete: Double read FValorFrete write FValorFrete;
     property ValorOutro: Double read FValorOutro write FValorOutro;
     property imposto: TImpostoDTO read FImposto write FImposto;
+    property combustivel: TCombustivelDTO read FCombustivel write FCombustivel;
   end;
 
   TPagamentoDTO = class
@@ -517,6 +536,8 @@ type
     FModFrete: string;
     FCNPJCPF: string;
     FAutXML: TArray<TAutXMLDTO>;
+    FDhCont: string;
+    FXJust: string;
   public
     property CertificadoSenha: string read FCertificadoSenha write FCertificadoSenha;
     property CodCSC: string read FCodCSC write FCodCSC;
@@ -544,6 +565,8 @@ type
     property IndIntermediador: string read FIndIntermediador write FIndIntermediador;
     property modFrete: string read FModFrete write FModFrete;
     property AutXml: TArray<TAutXMLDTO> read FAutXML write FAutXML;
+    property dhCont: string read FDhCont write FDhCont;
+    property xJust: string read FXJust write FXJust;
   end;
 
 

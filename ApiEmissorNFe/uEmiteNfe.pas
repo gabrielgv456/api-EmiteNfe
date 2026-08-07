@@ -460,6 +460,24 @@ begin
    NotaF.NFe.Ide.tpEmis    := StrToTpEmis(ok, reqNF.tpEmis);
    if not ok then raise Exception.Create('tpEmis incorreto');
 
+   // Contingência SVC: obrigatório dhCont + xJust quando não é emissão normal
+   if NotaF.NFe.Ide.tpEmis <> teNormal then
+   begin
+     if Length(Trim(reqNF.xJust)) < 15 then
+       raise Exception.Create('xJust obrigatório na contingência (mín. 15 caracteres)');
+     if Length(Trim(reqNF.xJust)) > 255 then
+       raise Exception.Create('xJust inválido (máx. 255 caracteres)');
+
+     if Trim(reqNF.dhCont) = EmptyStr then
+       NotaF.NFe.Ide.dhCont := Now
+     else
+       NotaF.NFe.Ide.dhCont := ParseIsoDateTime(reqNF.dhCont);
+
+     NotaF.NFe.Ide.xJust := Trim(reqNF.xJust);
+   end;
+
+   ACBrNFe.Configuracoes.Geral.FormaEmissao := NotaF.NFe.Ide.tpEmis;
+
    NotaF.NFe.Ide.tpAmb     := StrToTpAmb(ok, reqNF.ambiente);
    ACBRNfe.Configuracoes.WebServices.Ambiente := NotaF.NFe.Ide.tpAmb;
    if not ok then raise Exception.Create('ambiente incorreto');
@@ -782,6 +800,29 @@ begin
          end;
 
       end;
+
+      if Assigned(reqProduto.combustivel) and (Trim(reqProduto.combustivel.codigoANP) <> EmptyStr) then
+      begin
+        Produto.Prod.comb.cProdANP := StrToIntDef(reqProduto.combustivel.codigoANP, 0);
+        Produto.Prod.comb.descANP  := reqProduto.combustivel.descricaoANP;
+        Produto.Prod.comb.pBio     := reqProduto.combustivel.pBio;
+
+        Produto.Prod.comb.UFcons   := reqNF.Destinatario.Endereco.UF; // ajuste ao nome real no DTO
+
+        // NT 2023/001 — origem (origComb)
+        if (Trim(reqProduto.combustivel.indImport) <> EmptyStr)
+           or (Trim(reqProduto.combustivel.UFOrig) <> EmptyStr) then
+        begin
+          with Produto.Prod.comb.origComb.New do
+          begin
+            indImport := StrToindImport(ok, reqProduto.combustivel.indImport); // "0"/"1"
+            cUFOrig   := UFtoCUF(reqProduto.combustivel.UFOrig); // MG  31 (IBGE)
+            pOrig     := reqProduto.combustivel.pOrig;
+          end;
+        end;
+      end;
+
+
    end;
 
    if NotaF.NFe.Ide.modelo = 65 then

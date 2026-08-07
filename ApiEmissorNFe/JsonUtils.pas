@@ -12,6 +12,7 @@ interface
    function validateAllProperties(obj : TJSONObject; propertiesObject: TArray<string>) : string;
    function textBeforeOrAfterCharacter(out ok : boolean;TextOriginal, Character: string; GetBefore: Boolean): string;
    function Base64SaveFile(out ok : Boolean; base64, sArq: string) : string;
+   function ParseIsoDateTime(const S: string): TDateTime;
 implementation
 
 procedure JSONResponse(const AIDCode: Integer; const AContent: string);
@@ -126,6 +127,28 @@ begin
       FreeAndNil(lInput);
       FreeAndNil(lOutput);
    end;
+end;
+
+function ParseIsoDateTime(const S: string): TDateTime;
+var
+  T: string;
+  Y, M, D, Hh, Mm, Ss: Integer;
+begin
+  // aceita "2026-08-06T17:30:00.000Z" ou "...-03:00"
+  T := StringReplace(S, 'Z', '', [rfReplaceAll]);
+  if Pos('+', T) > 11 then
+    T := Copy(T, 1, Pos('+', T) - 1);
+  // corta offset "-03:00" no final (após a parte da hora)
+  if (Length(T) > 19) and (T[Length(T) - 5] = '-') and (T[Length(T) - 2] = ':') then
+    T := Copy(T, 1, Length(T) - 6);
+
+  Y  := StrToInt(Copy(T, 1, 4));
+  M  := StrToInt(Copy(T, 6, 2));
+  D  := StrToInt(Copy(T, 9, 2));
+  Hh := StrToInt(Copy(T, 12, 2));
+  Mm := StrToInt(Copy(T, 15, 2));
+  Ss := StrToInt(Copy(T, 18, 2));
+  Result := EncodeDate(Y, M, D) + EncodeTime(Hh, Mm, Ss, 0);
 end;
 
 
