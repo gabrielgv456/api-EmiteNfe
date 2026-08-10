@@ -447,9 +447,15 @@ begin
    NotaF.NFe.Ide.serie     := reqNF.serie;
    NotaF.NFe.Ide.nNF       := reqNF.nNF;
    NotaF.NFe.Ide.cNF       := GerarCodigoDFe(NotaF.NFe.Ide.nNF);
-   NotaF.NFe.Ide.dEmi      := Date;
-   NotaF.NFe.Ide.dSaiEnt   := Date;
-   NotaF.NFe.Ide.hSaiEnt   := Now;
+   if Trim(reqNF.dhEmi) = EmptyStr then begin
+      NotaF.NFe.Ide.dEmi      := Date;
+      NotaF.NFe.Ide.dSaiEnt   := Date;
+      NotaF.NFe.Ide.hSaiEnt   := Now;
+   end else begin
+      NotaF.NFe.Ide.dEmi      := ParseIsoDateTime(reqNF.dhEmi);
+      NotaF.NFe.Ide.dSaiEnt   := NotaF.NFe.Ide.dEmi ;
+      NotaF.NFe.Ide.hSaiEnt   := NotaF.NFe.Ide.dEmi ;
+   end;
    NotaF.NFe.Ide.cUF       := UFtoCUF(reqNF.cUF);
    NotaF.NFe.Ide.cMunFG    := reqNF.cMunFG;
    NotaF.NFe.Ide.verProc   := '1.0.0.0'; //Versão do seu sistema

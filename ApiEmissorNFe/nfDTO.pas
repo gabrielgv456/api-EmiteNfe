@@ -537,6 +537,7 @@ type
     FCNPJCPF: string;
     FAutXML: TArray<TAutXMLDTO>;
     FDhCont: string;
+    FDhEmi: string;
     FXJust: string;
   public
     property CertificadoSenha: string read FCertificadoSenha write FCertificadoSenha;
@@ -566,6 +567,7 @@ type
     property modFrete: string read FModFrete write FModFrete;
     property AutXml: TArray<TAutXMLDTO> read FAutXML write FAutXML;
     property dhCont: string read FDhCont write FDhCont;
+    property dhEmi: string read FDhEmi write FDhEmi;
     property xJust: string read FXJust write FXJust;
   end;
 
