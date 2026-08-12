@@ -196,6 +196,7 @@ begin
       infEvento.CNPJ   := req.GetValue<String>('CNPJCPF');
       infEvento.dhEvento := now;
       infEvento.tpEvento := teCancelamento;
+      InfEvento.nSeqEvento := 1;
       infEvento.detEvento.xJust := req.GetValue<String>('justificativa');
       infEvento.detEvento.nProt := req.GetValue<String>('protocolo');
       InfEvento.tpAmb := StrToTpAmb(ok,req.GetValue<String>('ambiente'));
@@ -386,9 +387,13 @@ begin
        ACbrNFe.NotasFiscais.GravarXML(pathSave);
        xml := loadFile(pathSave);
 
-       if ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cStat <> 100 then begin
-          raise Exception.Create( IntToStr(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cStat) +
-          ' - ' + ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMsg);
+       // 100 = autorizado; 150 = autorizado fora do prazo (NT 2025.001)
+       if not (ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cStat in [100, 150]) then begin
+         var cStatRej := ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.cStat;
+         var xRej := Trim(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMotivo);
+         if xRej = '' then
+           xRej := Trim(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMsg);
+         raise Exception.Create(IntToStr(cStatRej) + ' - ' + xRej);
        end;
 
        var objResult := TJSONObject.Create;
