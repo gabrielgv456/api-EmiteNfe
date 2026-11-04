@@ -523,6 +523,7 @@ type
     FTpNF: Integer;
     FSerie: Integer;
     FnNF: Integer;
+    FcNF: Integer;
     FEmitente: TEmitenteDTO;
     FDestinatario: TDestinatarioDTO;
     FEntrega: TEntregaDTO;
@@ -554,6 +555,7 @@ type
     property TpNF: Integer read FTpNF write FTpNF; //  ['0', '1'], [tnEntrada, tnSaida]);
     property Serie: Integer read FSerie write FSerie;
     property nNF: Integer read FnNF write FnNF;
+    property cNF: Integer read FcNF write FcNF;
     property Emitente: TEmitenteDTO read FEmitente write FEmitente;
     property Destinatario: TDestinatarioDTO read FDestinatario write FDestinatario;
     property Entrega: TEntregaDTO read FEntrega write FEntrega;

@@ -354,6 +354,101 @@ end;
 
 
 
+function TagInInfProt(const Xml, Tag: string): string;
+var
+   i, j, a, b: Integer;
+   inner, openTag: string;
+begin
+   Result := '';
+   i := Pos('<infProt', Xml);
+   if i = 0 then Exit;
+   j := PosEx('</infProt>', Xml, i);
+   if j <= i then Exit;
+   inner := Copy(Xml, i, j - i);
+   openTag := '<' + Tag + '>';
+   a := Pos(openTag, inner);
+   if a = 0 then Exit;
+   a := a + Length(openTag);
+   b := PosEx('</' + Tag + '>', inner, a);
+   if b <= a then Exit;
+   Result := Copy(inner, a, b - a);
+end;
+
+function Chave44DepoisDe(const Text, Marker: string): string;
+var
+   p, i: Integer;
+   d: string;
+begin
+   Result := '';
+   p := Pos(Marker, Text);
+   if p = 0 then Exit;
+   d := '';
+   for i := p + Length(Marker) to Length(Text) do
+   begin
+      if CharInSet(Text[i], ['0'..'9']) then
+         d := d + Text[i]
+      else if d <> '' then
+         Break;
+      if Length(d) = 44 then
+         Exit(d);
+   end;
+end;
+
+function CStatDuplicidade(const Msg: string): string;
+begin
+   if (Pos('chNFe:', Msg) > 0) or ContainsText(Msg, 'Chave de Acesso') then
+      Result := '539'
+   else if StartsStr('539', Trim(Msg)) then
+      Result := '539'
+   else
+      Result := '204';
+end;
+
+function EhDuplicidade(const Msg: string; cStat: Integer): Boolean;
+begin
+   Result := (cStat = 204) or (cStat = 539) or ContainsText(Msg, 'Duplicidade de NF-e');
+end;
+
+function DuplicidadeJson(const ProfilePath, Motivo, InfId: string): string;
+var
+   obj: TJSONObject;
+   tentativa, citada, xmlPath, xml, cStat, protocolo: string;
+begin
+   tentativa := InfId;
+   if StartsText('NFe', tentativa) then
+      tentativa := Copy(tentativa, 4, MaxInt);
+   citada := Chave44DepoisDe(Motivo, 'chNFe:');
+   if citada = '' then
+      citada := tentativa;
+
+   cStat := CStatDuplicidade(Motivo);
+   protocolo := '';
+   xml := '';
+   xmlPath := ProfilePath + 'xmls/enviados/NFe' + citada + '.xml';
+   if FileExists(xmlPath) then
+   begin
+      xml := loadFile(xmlPath);
+      if TagInInfProt(xml, 'cStat') <> '' then
+         cStat := TagInInfProt(xml, 'cStat');
+      protocolo := TagInInfProt(xml, 'nProt');
+   end;
+
+   obj := TJSONObject.Create;
+   try
+      obj.AddPair('NFe', InfId);
+      obj.AddPair('chNFe', citada);
+      obj.AddPair('cStat', cStat);
+      obj.AddPair('xMotivo', Motivo);
+      if protocolo <> '' then
+         obj.AddPair('Protocolo', protocolo);
+      if xml <> '' then
+         obj.AddPair('xml', xml);
+      Result := obj.ToString;
+   finally
+      obj.Free;
+   end;
+end;
+
 function TEmiteNFe.EnviaNFe() : string;
 var pathSave, xml: string;
 begin
@@ -382,7 +477,20 @@ begin
        ACBrNFe.NotasFiscais.Validar;
 
 
-       ACBrNFe.Enviar(1, False, True);
+       try
+          ACBrNFe.Enviar(1, False, True);
+       except
+          on E: Exception do
+          begin
+             if EhDuplicidade(E.Message, 0) then
+             begin
+                Result := DuplicidadeJson(profilePath, E.Message,
+                   ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
+                Exit;
+             end;
+             raise;
+          end;
+       end;
 
        ACbrNFe.NotasFiscais.GravarXML(pathSave);
        xml := loadFile(pathSave);
@@ -393,6 +501,13 @@ begin
          var xRej := Trim(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMotivo);
          if xRej = '' then
            xRej := Trim(ACBrNFe.NotasFiscais.Items[0].NFe.procNFe.xMsg);
+         if EhDuplicidade(xRej, cStatRej) then
+         begin
+            Result := DuplicidadeJson(profilePath,
+               IntToStr(cStatRej) + ' - ' + xRej,
+               ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
+            Exit;
+         end;
          raise Exception.Create(IntToStr(cStatRej) + ' - ' + xRej);
        end;
 
@@ -419,6 +534,10 @@ begin
            objResult.AddPair('NFe',ACBrNFe.NotasFiscais.Items[0].NFe.infNFe.ID);
            objResult.AddPair('profile',globalConfig.profile);
            objResult.AddPair('xml',xml);
+           if TagInInfProt(xml, 'cStat') <> '' then
+              objResult.AddPair('cStat', TagInInfProt(xml, 'cStat'));
+           if TagInInfProt(xml, 'nProt') <> '' then
+              objResult.AddPair('Protocolo', TagInInfProt(xml, 'nProt'));
            Result := objResult.ToString;
         finally
            objResult.Free;
@@ -451,7 +570,10 @@ begin
    NotaF.NFe.Ide.modelo    := modelo; // Ajustar
    NotaF.NFe.Ide.serie     := reqNF.serie;
    NotaF.NFe.Ide.nNF       := reqNF.nNF;
-   NotaF.NFe.Ide.cNF       := GerarCodigoDFe(NotaF.NFe.Ide.nNF);
+   if reqNF.cNF > 0 then
+      NotaF.NFe.Ide.cNF    := reqNF.cNF
+   else
+      NotaF.NFe.Ide.cNF    := GerarCodigoDFe(NotaF.NFe.Ide.nNF);
    if Trim(reqNF.dhEmi) = EmptyStr then begin
       NotaF.NFe.Ide.dEmi      := Date;
       NotaF.NFe.Ide.dSaiEnt   := Date;
