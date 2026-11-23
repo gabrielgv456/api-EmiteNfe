@@ -160,7 +160,7 @@ end;
 function TNfeController.consultaNF: string;
 var
     emiteNFE  : TEmiteNfe;
-    res , chave, ambiente: string;
+    res , chave, ambiente, certSenha: string;
     params: TDSInvocationMetadata;
     i : integer;
     ok:boolean;
@@ -175,11 +175,15 @@ begin
           if not ok then raise Exception.Create('Informe corretamente o parametro "ambiente"');
           ambiente :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
        end;
+       if textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',True) = 'certificadoSenha' then begin
+          if not ok then raise Exception.Create('Informe corretamente o parametro "certificadoSenha"');
+          certSenha :=  textBeforeOrAfterCharacter(ok,params.QueryParams[i],'=',False);
+       end;
    end;
    if chave = EmptyStr then raise Exception.Create('Informe corretamente o parametro "chave"');
    emiteNFE := TEmiteNfe.Create(GlobalConfig.profile);
    try
-      res := emiteNFE.ConsultaNF(chave, ambiente);
+      res := emiteNFE.ConsultaNF(chave, ambiente, certSenha);
       Result := res;
       JSONResponse(200,res);
    finally
