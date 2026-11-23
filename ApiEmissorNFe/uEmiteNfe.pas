@@ -591,8 +591,10 @@ begin
    NotaF.NFe.Ide.verProc   := '1.0.0.0'; //Versão do seu sistema
    NotaF.NFe.Ide.indPag    := StrToIndpag(ok, reqNF.indPag);
    if not ok then raise Exception.Create('indPag incorreto!');
-   NotaF.NFe.Ide.tpNF      := StrToTpNF(ok, IntToStr(reqNF.TpNF));
-   if not ok then raise Exception.Create('tpNF incorreto');
+   var vTpNF: TTipoNFe;
+   if not TryStrToTpNF(IntToStr(reqNF.TpNF), vTpNF) then
+      raise Exception.Create('tpNF incorreto');
+   NotaF.NFe.Ide.tpNF      := vTpNF;
    NotaF.NFe.Ide.tpEmis    := StrToTpEmis(ok, reqNF.tpEmis);
    if not ok then raise Exception.Create('tpEmis incorreto');
 
@@ -679,8 +681,10 @@ begin
    if Assigned(reqNF.Destinatario) then begin
 
       NotaF.NFe.Dest.CNPJCPF           := reqNF.Destinatario.CNPJCPF;
-      NotaF.NFe.Dest.indIEDest         := StrToindIEDest(ok,IntToStr(reqNF.Destinatario.indIEDest));
-      if not ok then raise Exception.Create('indIEDest incorreto.');
+      var vIndIEDest: TindIEDest;
+      if not TryStrToindIEDest(IntToStr(reqNF.Destinatario.indIEDest), vIndIEDest) then
+         raise Exception.Create('indIEDest incorreto.');
+      NotaF.NFe.Dest.indIEDest         := vIndIEDest;
       if NotaF.NFe.Dest.indIEDest = inContribuinte then
       NotaF.NFe.Dest.IE                := reqNF.Destinatario.IE;
       NotaF.NFe.Dest.ISUF              := reqNF.Destinatario.ISUF;
@@ -792,8 +796,10 @@ begin
          if Assigned(reqProduto.imposto.ICMS) then begin
             with ICMS do begin
                // ORIGEM MERCADORIA
-               orig := StrToOrig(ok,reqProduto.imposto.origemMercadoria) ;
-               if not ok then raise Exception.Create('origemMercadoria incorreto!');
+               var vOrig: TOrigemMercadoria;
+               if not TryStrToOrig(reqProduto.imposto.origemMercadoria, vOrig) then
+                  raise Exception.Create('origemMercadoria incorreto!');
+               orig := vOrig;
 
                // FCP - FUNDO DE COMBATE A POBREZA
                pFCP := reqProduto.imposto.ICMS.pFCP;
@@ -801,11 +807,15 @@ begin
 
                // DADOS ICMS NORMAL
                if NotaF.NFe.Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then begin
-                  CST  := StrToCSTICMS(ok, reqProduto.imposto.ICMS.CST);
-                  if not ok then raise Exception.Create('CST incorreto!');
+                  var vCST: TCSTIcms;
+                  if not TryStrToCSTICMS(reqProduto.imposto.ICMS.CST, vCST) then
+                     raise Exception.Create('CST incorreto!');
+                  CST := vCST;
                end else begin
-                  CSOSN := StrToCSOSNIcms(ok, reqProduto.imposto.ICMS.CSOSN);
-                  if not ok then raise Exception.Create('CSOSN incorreto');
+                  var vCSOSN: TCSOSNIcms;
+                  if not TryStrToCSOSNIcms(reqProduto.imposto.ICMS.CSOSN, vCSOSN) then
+                     raise Exception.Create('CSOSN incorreto');
+                  CSOSN := vCSOSN;
                   pCredSN := reqProduto.imposto.ICMS.pCredSN;
                   //vCredICMSSN := 100 * pCredSN / 100;
                end;
@@ -869,8 +879,10 @@ begin
          if Assigned(reqProduto.imposto.PIS) then begin
             with PIS do
             begin
-               CST  := StrToCSTPIS(ok,reqProduto.imposto.PIS.CST);
-               if not ok then raise Exception.Create('CST PIS incorreto!');
+               var vCSTPIS: TCSTPIS;
+               if not TryStrToCSTPIS(reqProduto.imposto.PIS.CST, vCSTPIS) then
+                  raise Exception.Create('CST PIS incorreto!');
+               CST := vCSTPIS;
                vBC  := reqProduto.imposto.PIS.vBC;
                pPIS := reqProduto.imposto.PIS.pPIS;
                vPIS := reqProduto.imposto.PIS.vPIS;
@@ -881,8 +893,10 @@ begin
          if Assigned(reqProduto.imposto.COFINS) then begin
             with COFINS do
             begin
-               CST     := StrToCSTCOFINS(ok, reqProduto.imposto.COFINS.CST);
-               if not ok then raise Exception.Create('CST COFINS incorreto!');
+               var vCSTCOFINS: TCSTCofins;
+               if not TryStrToCSTCOFINS(reqProduto.imposto.COFINS.CST, vCSTCOFINS) then
+                  raise Exception.Create('CST COFINS incorreto!');
+               CST := vCSTCOFINS;
                vBC     := reqProduto.imposto.COFINS.vBC;
                pCOFINS := reqProduto.imposto.COFINS.pCOFINS;
                vCOFINS := reqProduto.imposto.COFINS.vCOFINS;
@@ -897,7 +911,7 @@ begin
            begin
              with Produto.Imposto.ISel do  // nome no ACBr — conferir
              begin
-               CSTIS        := StrToCSTIS(reqProduto.imposto.reforma.ImpostoSeletivo.CST);
+               CSTIS        := CSTISToStr(StrToCSTIS(reqProduto.imposto.reforma.ImpostoSeletivo.CST));
                cClassTribIS := reqProduto.imposto.reforma.ImpostoSeletivo.cClassTrib;
                pIS          := reqProduto.imposto.reforma.ImpostoSeletivo.pIS;
                vBCIS        := reqProduto.ValorTotalProdutos;
