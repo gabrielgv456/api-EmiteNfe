@@ -18,7 +18,7 @@ type
       function GerarNFCe(dataReq:TJSONObject) : string;
       function EventoCancelamento(req: TJSONObject): string;
       function StatusServico(certSenha, UF, ambiente:string): string;
-      function ConsultaNF(chave: string;ambiente:string) : string;
+      function ConsultaNF(chave, ambiente, certSenha: string): string;
       function EventoCartaCorrecao(req: TJSONObject): string;
       function InutilizaNumeracao(req: TJSONObject): string;
    private
@@ -108,7 +108,7 @@ begin
    end;
 end;
 
-function TEmiteNfe.ConsultaNF(chave:string; ambiente:string) : string;
+function TEmiteNfe.ConsultaNF(chave, ambiente, certSenha: string): string;
 var ok: boolean;
 begin
    ACBrNFe.NotasFiscais.Clear;
@@ -116,6 +116,8 @@ begin
 
    ACBRNfe.Configuracoes.WebServices.Ambiente := StrToTpAmb(ok,ambiente);
    if not ok then raise Exception.Create('Ambiente incorreto!');
+   if certSenha <> '' then
+      ACBrNFe.Configuracoes.Certificados.Senha := AnsiString(certSenha);
 
    ACBrNFe.WebServices.Consulta.Executar;
 
@@ -555,6 +557,7 @@ var
    InfoPgto: TpagCollectionItem;
    ObsComplementar : TobsContCollectionItem;
    ObsFisco: TobsFiscoCollectionItem;
+   Volume: TVolCollectionItem;
    ok: Boolean;
 begin
    reqNF := Rest.JSON.TJson.JsonToObject<TNotaFiscalDTO>(req);
@@ -963,6 +966,37 @@ begin
    else begin
       NotaF.NFe.Transp.modFrete := StrTomodFrete(Ok,reqNF.modFrete); //EnumeradoToStr(t, ['0', '1', '2', '3', '4', '9'], [mfContaEmitente, mfContaDestinatario, mfContaTerceiros, mfProprioRemetente, mfProprioDestinatario, mfSemFrete]);
       if not ok then raise Exception.Create('modFrete incorreto!');
+   end;
+
+   if (NotaF.NFe.Ide.modelo <> 65) and Assigned(reqNF.transportadora) then begin
+      NotaF.NFe.Transp.Transporta.CNPJCPF := reqNF.transportadora.CNPJCPF;
+      NotaF.NFe.Transp.Transporta.xNome    := reqNF.transportadora.nome;
+      if Trim(reqNF.transportadora.IE) <> '' then
+         NotaF.NFe.Transp.Transporta.IE    := reqNF.transportadora.IE;
+      NotaF.NFe.Transp.Transporta.xEnder   := reqNF.transportadora.ender;
+      NotaF.NFe.Transp.Transporta.xMun     := reqNF.transportadora.mun;
+      NotaF.NFe.Transp.Transporta.UF       := reqNF.transportadora.UF;
+
+      if Assigned(reqNF.transportadora.volume) then begin
+         Volume := NotaF.NFe.Transp.Vol.New;
+         Volume.qVol  := reqNF.transportadora.volume.qVol;
+         if Trim(reqNF.transportadora.volume.esp) <> '' then
+            Volume.esp   := reqNF.transportadora.volume.esp;
+         if Trim(reqNF.transportadora.volume.marca) <> '' then
+            Volume.marca := reqNF.transportadora.volume.marca;
+         if Trim(reqNF.transportadora.volume.nVol) <> '' then
+            Volume.nVol  := reqNF.transportadora.volume.nVol;
+         Volume.pesoL := reqNF.transportadora.volume.pesoL;
+         Volume.pesoB := reqNF.transportadora.volume.pesoB;
+      end;
+
+      if Assigned(reqNF.transportadora.veiculo) and
+         (Trim(reqNF.transportadora.veiculo.placa) <> '') then begin
+         NotaF.NFe.Transp.veicTransp.placa := reqNF.transportadora.veiculo.placa;
+         NotaF.NFe.Transp.veicTransp.UF    := reqNF.transportadora.veiculo.UF;
+         if Trim(reqNF.transportadora.veiculo.RNTC) <> '' then
+            NotaF.NFe.Transp.veicTransp.RNTC := reqNF.transportadora.veiculo.RNTC;
+      end;
    end;
 
    // PAGAMENTO

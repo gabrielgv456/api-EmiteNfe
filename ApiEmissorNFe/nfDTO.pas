@@ -507,6 +507,55 @@ type
      property CNPJCPF: string read FCNPJCPF write FCNPJCPF;
   end;
 
+  TVolumeDTO = class
+  private
+    FqVol: Integer;
+    Fesp: string;
+    Fmarca: string;
+    FnVol: string;
+    FpesoL: Double;
+    FpesoB: Double;
+  public
+    property qVol: Integer read FqVol write FqVol;
+    property esp: string read Fesp write Fesp;
+    property marca: string read Fmarca write Fmarca;
+    property nVol: string read FnVol write FnVol;
+    property pesoL: Double read FpesoL write FpesoL;
+    property pesoB: Double read FpesoB write FpesoB;
+  end;
+
+  TVeiculoTranspDTO = class
+  private
+    Fplaca: string;
+    FUF: string;
+    FRNTC: string;
+  public
+    property placa: string read Fplaca write Fplaca;
+    property UF: string read FUF write FUF;
+    property RNTC: string read FRNTC write FRNTC;
+  end;
+
+  TTransportadoraDTO = class
+  private
+    FCNPJCPF: string;
+    Fnome: string;
+    FIE: string;
+    Fender: string;
+    Fmun: string;
+    FUF: string;
+    Fvolume: TVolumeDTO;
+    Fveiculo: TVeiculoTranspDTO;
+  public
+    property CNPJCPF: string read FCNPJCPF write FCNPJCPF;
+    property nome: string read Fnome write Fnome;
+    property IE: string read FIE write FIE;
+    property ender: string read Fender write Fender;
+    property mun: string read Fmun write Fmun;
+    property UF: string read FUF write FUF;
+    property volume: TVolumeDTO read Fvolume write Fvolume;
+    property veiculo: TVeiculoTranspDTO read Fveiculo write Fveiculo;
+  end;
+
   TNotaFiscalDTO = class
   private
     FCertificadoSenha: string;
@@ -535,6 +584,7 @@ type
     FobsFisco: TArray<TObsDTO>;
     FIndIntermediador: string;
     FModFrete: string;
+    FTransportadora: TTransportadoraDTO;
     FCNPJCPF: string;
     FAutXML: TArray<TAutXMLDTO>;
     FDhCont: string;
@@ -567,6 +617,7 @@ type
     property obsFisco: TArray<TObsDTO> read FobsFisco write FobsFisco;
     property IndIntermediador: string read FIndIntermediador write FIndIntermediador;
     property modFrete: string read FModFrete write FModFrete;
+    property transportadora: TTransportadoraDTO read FTransportadora write FTransportadora;
     property AutXml: TArray<TAutXMLDTO> read FAutXML write FAutXML;
     property dhCont: string read FDhCont write FDhCont;
     property dhEmi: string read FDhEmi write FDhEmi;
