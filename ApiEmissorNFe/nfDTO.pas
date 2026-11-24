@@ -125,6 +125,19 @@ type
     FvICMSSTDeson: Double;
     FvICMSSTRet: Double;
     FvICMSSubstituto: Double;
+    // ICMS monofásico sobre combustíveis (NT 2023.001)
+    FqBCMono: Double;
+    FadRemICMS: Double;
+    FvICMSMono: Double;
+    FqBCMonoReten: Double;
+    FadRemICMSReten: Double;
+    FvICMSMonoReten: Double;
+    FvICMSMonoOp: Double;
+    FpDif: Double;
+    FvICMSMonoDif: Double;
+    FqBCMonoRet: Double;
+    FadRemICMSRet: Double;
+    FvICMSMonoRet: Double;
   public
     property CSOSN: string read FCSOSN write FCSOSN;
     property CST: string read FCST write FCST;
@@ -158,6 +171,19 @@ type
     property vICMSSTDeson: Double read FvICMSSTDeson write FvICMSSTDeson;
     property vICMSSTRet: Double read FvICMSSTRet write FvICMSSTRet;
     property vICMSSubstituto: Double read FvICMSSubstituto write FvICMSSubstituto;
+    // ICMS monofásico sobre combustíveis (NT 2023.001) - CST 02/15/53/61
+    property qBCMono: Double read FqBCMono write FqBCMono;
+    property adRemICMS: Double read FadRemICMS write FadRemICMS;
+    property vICMSMono: Double read FvICMSMono write FvICMSMono;
+    property qBCMonoReten: Double read FqBCMonoReten write FqBCMonoReten;
+    property adRemICMSReten: Double read FadRemICMSReten write FadRemICMSReten;
+    property vICMSMonoReten: Double read FvICMSMonoReten write FvICMSMonoReten;
+    property vICMSMonoOp: Double read FvICMSMonoOp write FvICMSMonoOp;
+    property pDif: Double read FpDif write FpDif;
+    property vICMSMonoDif: Double read FvICMSMonoDif write FvICMSMonoDif;
+    property qBCMonoRet: Double read FqBCMonoRet write FqBCMonoRet;
+    property adRemICMSRet: Double read FadRemICMSRet write FadRemICMSRet;
+    property vICMSMonoRet: Double read FvICMSMonoRet write FvICMSMonoRet;
   end;
 
   TCOFINSDTO = class
@@ -434,6 +460,13 @@ type
     FvSeg: Currency;
     FvST: Currency;
     FvTotTrib: Currency;
+    // Totais do ICMS monofásico (NT 2023.001)
+    FqBCMono: Double;
+    FvICMSMono: Currency;
+    FqBCMonoReten: Double;
+    FvICMSMonoReten: Currency;
+    FqBCMonoRet: Double;
+    FvICMSMonoRet: Currency;
   public
     property vNF: Currency read FvNF write FvNF;
     property vBC: Currency read FvBC write FvBC;
@@ -455,6 +488,12 @@ type
     property vSeg: Currency read FvSeg write FvSeg;
     property vST: Currency read FvST write FvST;
     property vTotTrib: Currency read FvTotTrib write FvTotTrib;
+    property qBCMono: Double read FqBCMono write FqBCMono;
+    property vICMSMono: Currency read FvICMSMono write FvICMSMono;
+    property qBCMonoReten: Double read FqBCMonoReten write FqBCMonoReten;
+    property vICMSMonoReten: Currency read FvICMSMonoReten write FvICMSMonoReten;
+    property qBCMonoRet: Double read FqBCMonoRet write FqBCMonoRet;
+    property vICMSMonoRet: Currency read FvICMSMonoRet write FvICMSMonoRet;
   end;
 
   TIBSCBSTotDTO = class

@@ -843,6 +843,32 @@ begin
                pICMSST  := reqProduto.imposto.ICMS.pICMSST;
                vICMSST  := reqProduto.imposto.ICMS.vICMSST;
 
+               // ICMS MONOFÁSICO SOBRE COMBUSTÍVEIS (NT 2023.001) - CST 02/15/53/61
+               // Valores já calculados pelo SaaS (quantidade x ad rem). Só atribui nos CSTs
+               // monofásicos para não mexer no pDif do CST 51.
+               if NotaF.NFe.Emit.CRT in [crtSimplesExcessoReceita, crtRegimeNormal] then begin
+                  if CST in [cst02, cst15, cst53] then begin
+                     qBCMono   := reqProduto.imposto.ICMS.qBCMono;
+                     adRemICMS := reqProduto.imposto.ICMS.adRemICMS;
+                     vICMSMono := reqProduto.imposto.ICMS.vICMSMono;
+                  end;
+                  if CST = cst15 then begin
+                     qBCMonoReten   := reqProduto.imposto.ICMS.qBCMonoReten;
+                     adRemICMSReten := reqProduto.imposto.ICMS.adRemICMSReten;
+                     vICMSMonoReten := reqProduto.imposto.ICMS.vICMSMonoReten;
+                  end;
+                  if CST = cst53 then begin
+                     vICMSMonoOp  := reqProduto.imposto.ICMS.vICMSMonoOp;
+                     pDif         := reqProduto.imposto.ICMS.pDif;
+                     vICMSMonoDif := reqProduto.imposto.ICMS.vICMSMonoDif;
+                  end;
+                  if CST = cst61 then begin
+                     qBCMonoRet   := reqProduto.imposto.ICMS.qBCMonoRet;
+                     adRemICMSRet := reqProduto.imposto.ICMS.adRemICMSRet;
+                     vICMSMonoRet := reqProduto.imposto.ICMS.vICMSMonoRet;
+                  end;
+               end;
+
             end;
          end;
 
@@ -1059,6 +1085,13 @@ begin
    NotaF.NFe.Total.ICMSTot.vFCPST       := reqNF.Total.ICMS.vFCPST;
    NotaF.NFe.Total.ICMSTot.vFCPSTRet    := reqNF.Total.ICMS.vFCPSTRet;
    NotaF.NFe.Total.ICMSTot.vTotTrib     := reqNF.Total.ICMS.vTotTrib;
+   // Totais do ICMS monofásico (NT 2023.001) - zero quando não há item monofásico
+   NotaF.NFe.Total.ICMSTot.qBCMono        := reqNF.Total.ICMS.qBCMono;
+   NotaF.NFe.Total.ICMSTot.vICMSMono      := reqNF.Total.ICMS.vICMSMono;
+   NotaF.NFe.Total.ICMSTot.qBCMonoReten   := reqNF.Total.ICMS.qBCMonoReten;
+   NotaF.NFe.Total.ICMSTot.vICMSMonoReten := reqNF.Total.ICMS.vICMSMonoReten;
+   NotaF.NFe.Total.ICMSTot.qBCMonoRet     := reqNF.Total.ICMS.qBCMonoRet;
+   NotaF.NFe.Total.ICMSTot.vICMSMonoRet   := reqNF.Total.ICMS.vICMSMonoRet;
 
    // Reforma
    if Assigned(reqNF.Total.IBSCBSTot) then begin
