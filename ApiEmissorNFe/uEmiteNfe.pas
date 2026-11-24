@@ -861,6 +861,8 @@ begin
                      vICMSMonoOp  := reqProduto.imposto.ICMS.vICMSMonoOp;
                      pDif         := reqProduto.imposto.ICMS.pDif;
                      vICMSMonoDif := reqProduto.imposto.ICMS.vICMSMonoDif;
+                     qBCMonoDif   := reqProduto.imposto.ICMS.qBCMonoDif;
+                     adRemICMSDif := reqProduto.imposto.ICMS.adRemICMSDif;
                   end;
                   if CST = cst61 then begin
                      qBCMonoRet   := reqProduto.imposto.ICMS.qBCMonoRet;

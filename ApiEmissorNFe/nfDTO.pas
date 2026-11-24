@@ -135,6 +135,8 @@ type
     FvICMSMonoOp: Double;
     FpDif: Double;
     FvICMSMonoDif: Double;
+    FqBCMonoDif: Double;
+    FadRemICMSDif: Double;
     FqBCMonoRet: Double;
     FadRemICMSRet: Double;
     FvICMSMonoRet: Double;
@@ -181,6 +183,8 @@ type
     property vICMSMonoOp: Double read FvICMSMonoOp write FvICMSMonoOp;
     property pDif: Double read FpDif write FpDif;
     property vICMSMonoDif: Double read FvICMSMonoDif write FvICMSMonoDif;
+    property qBCMonoDif: Double read FqBCMonoDif write FqBCMonoDif;
+    property adRemICMSDif: Double read FadRemICMSDif write FadRemICMSDif;
     property qBCMonoRet: Double read FqBCMonoRet write FqBCMonoRet;
     property adRemICMSRet: Double read FadRemICMSRet write FadRemICMSRet;
     property vICMSMonoRet: Double read FvICMSMonoRet write FvICMSMonoRet;
