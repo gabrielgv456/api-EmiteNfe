@@ -919,32 +919,36 @@ begin
              end;
            end;
 
-           // IBS/CBS — obrigatório em homolog MG (CRT 3)
+           // IBS/CBS. CST 620 (monofásico) não leva gIBSCBS: ind_gIBSCBS = 0 (UB13-20).
            if Assigned(reqProduto.imposto.reforma.IBSCBS) then
            begin
+             var cstIbs: string;
+             cstIbs := Trim(reqProduto.imposto.reforma.IBSCBS.CST);
              with Produto.Imposto.IBSCBS do
              begin
-               CST := StrToCSTIBSCBS(reqProduto.imposto.reforma.IBSCBS.CST);
-
+               CST := StrToCSTIBSCBS(cstIbs);
                cClassTrib := reqProduto.imposto.reforma.IBSCBS.cClassTrib;
 
-               gIBSCBS.vBC := reqProduto.imposto.reforma.IBSCBS.vBC;
-               gIBSCBS.vIBS := reqProduto.imposto.reforma.IBSCBS.vIBS;
+               if cstIbs <> '620' then
+               begin
+                 gIBSCBS.vBC := reqProduto.imposto.reforma.IBSCBS.vBC;
+                 gIBSCBS.vIBS := reqProduto.imposto.reforma.IBSCBS.vIBS;
 
-               gIBSCBS.gIBSUF.pIBSUF := reqProduto.imposto.reforma.IBSCBS.pIBSUF;
-               gIBSCBS.gIBSUF.vIBSUF := reqProduto.imposto.reforma.IBSCBS.vIBSUF;
-               gIBSCBS.gIBSUF.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifIBSUF;
-               gIBSCBS.gIBSUF.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedIBSUF;
+                 gIBSCBS.gIBSUF.pIBSUF := reqProduto.imposto.reforma.IBSCBS.pIBSUF;
+                 gIBSCBS.gIBSUF.vIBSUF := reqProduto.imposto.reforma.IBSCBS.vIBSUF;
+                 gIBSCBS.gIBSUF.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifIBSUF;
+                 gIBSCBS.gIBSUF.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedIBSUF;
 
-               gIBSCBS.gIBSMun.pIBSMun := reqProduto.imposto.reforma.IBSCBS.pIBSMun;
-               gIBSCBS.gIBSMun.vIBSMun := reqProduto.imposto.reforma.IBSCBS.vIBSMun;
-               gIBSCBS.gIBSMun.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifIBSMun;
-               gIBSCBS.gIBSMun.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedIBSMun;
+                 gIBSCBS.gIBSMun.pIBSMun := reqProduto.imposto.reforma.IBSCBS.pIBSMun;
+                 gIBSCBS.gIBSMun.vIBSMun := reqProduto.imposto.reforma.IBSCBS.vIBSMun;
+                 gIBSCBS.gIBSMun.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifIBSMun;
+                 gIBSCBS.gIBSMun.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedIBSMun;
 
-               gIBSCBS.gCBS.pCBS := reqProduto.imposto.reforma.IBSCBS.pCBS;
-               gIBSCBS.gCBS.vCBS := reqProduto.imposto.reforma.IBSCBS.vCBS;
-               gIBSCBS.gCBS.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifCBS;
-               gIBSCBS.gCBS.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedCBS;
+                 gIBSCBS.gCBS.pCBS := reqProduto.imposto.reforma.IBSCBS.pCBS;
+                 gIBSCBS.gCBS.vCBS := reqProduto.imposto.reforma.IBSCBS.vCBS;
+                 gIBSCBS.gCBS.gDif.pDif := reqProduto.imposto.reforma.IBSCBS.pDifCBS;
+                 gIBSCBS.gCBS.gRed.pRedAliq := reqProduto.imposto.reforma.IBSCBS.pRedCBS;
+               end;
              end;
            end;
          end;
