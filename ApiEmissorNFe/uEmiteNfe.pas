@@ -146,6 +146,11 @@ var
 begin
    validateAllProperties(req,['chave','idLote','CNPJCPF','nSeqEvento','correcao','ambiente']);
 
+   // Igual ao cancelamento: sem senha/UF o ACBr nao assina nem acha o webservice.
+   ACBrNFe.Configuracoes.Certificados.Senha  := AnsiString(req.GetValue<string>('certificadoSenha', ''));
+   if req.GetValue<String>('cUF', '') <> '' then
+      ACBRNfe.Configuracoes.WebServices.UF   := req.GetValue<String>('cUF');
+
    ACBrNFe.EventoNFe.Evento.Clear;
 
    with ACBrNFe.EventoNFe.Evento.New do
@@ -165,12 +170,19 @@ begin
 
    ACBrNFe.EnviarEvento(req.GetValue<Integer>('idLote'));
 
+   if ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Count = 0 then
+      raise Exception.Create(IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat)
+         + ' - ' + ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
+
    var objResult := TJSONObject.Create;
    try
       objResult.AddPair('tpAmb',TpAmbToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.TpAmb));
       objResult.AddPair('verAplic',ACBrNFe.WebServices.EnvEvento.EventoRetorno.verAplic);
-      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
-      objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
+      // cStat/xMotivo do EVENTO (135/136 = registrado); o do lote vai em cStatLote/xMotivoLote.
+      objResult.AddPair('cStat',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.cStat));
+      objResult.AddPair('xMotivo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.xMotivo);
+      objResult.AddPair('cStatLote',IntToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.cStat));
+      objResult.AddPair('xMotivoLote',ACBrNFe.WebServices.EnvEvento.EventoRetorno.xMotivo);
       objResult.AddPair('chNFe',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.chNFe);
       objResult.AddPair('dhRegEvento',DateTimeToStr(ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.dhRegEvento));
       objResult.AddPair('Protocolo',ACBrNFe.WebServices.EnvEvento.EventoRetorno.retEvento.Items[0].RetInfEvento.nProt);
